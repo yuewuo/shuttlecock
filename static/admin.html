@@ -20,6 +20,39 @@
             <el-button type="danger" @click="unlogin()">退出登录</el-button>
         </span>
     </p>
+        <el-button type="success" :loading="login_ing" @click="new_class()">新建班级</el-button>
+        <strong style="margin-left: 20px">新建班级编号<code>cid</code>：{{ new_class_cid }}</strong>
+    </p>
+    <el-table :data="all_class_info_ret" style="width: 100%">
+        <el-table-column label="cid" width="50">
+        <template slot-scope="scope">
+            {{ scope.row.cid }}
+        </template>
+        </el-table-column>
+        <el-table-column label="创建日期">
+        <template slot-scope="scope">
+            <i class="el-icon-time"></i>
+            <span style="margin-left: 10px">{{ scope.row.create_time }}</span>
+        </template>
+        </el-table-column>
+        <el-table-column label="URL">
+        <template slot-scope="scope">
+            <el-input v-model="scope.row.url" placeholder="请输入内容"></el-input>
+        </template>
+        </el-table-column>
+        <el-table-column label="描述信息">
+        <template slot-scope="scope">
+            <el-input type="textarea" :rows="2" placeholder="请输入内容" v-model="scope.row.note"></el-input>
+        </template>
+        </el-table-column>
+        <el-table-column label="操作">
+        <template slot-scope="scope">
+            <el-button size="mini" type="primary" @click="alert(1)">学生名单</el-button>
+            <el-button v-show="scope.row.frozen==0" size="mini" type="danger" @click="alert(1)">冻结</el-button>
+            <el-button v-show="scope.row.frozen==1" size="mini" type="success" @click="alert(1)">解锁</el-button>
+        </template>
+        </el-table-column>
+    </el-table>
 </div>
 <script src="./js/vue.dev.js"></script>
 <!-- <script src="./js/vue.js"></script> -->
@@ -33,6 +66,8 @@ var app = new Vue({
         password: "",
         login_ing: false,
         login_hint: "登录",
+        new_class_cid: -1,
+        all_class_info_ret: [],
     },
     methods: {
         login() {
@@ -49,7 +84,6 @@ var app = new Vue({
                     app.admin = true;
                     app.password = "";
                 }
-                console.log(response);
                 app.login_ing = false;
             })
             .catch(function (error) {
@@ -65,6 +99,30 @@ var app = new Vue({
                 app.login_hint = "登录";
             });
         },
+        new_class() {
+            return axios.post('/new_class')
+            .then(function (response) {
+                app.new_class_cid = response.data.cid;
+                app.all_class_info();
+            })
+            .catch(function (error) {
+                console.error(error);
+            });
+        },
+        all_class_info() {
+            return axios.get('/all_class_info')
+            .then(function (response) {
+                app.all_class_info_ret = response.data.sort((a,b)=>b.cid-a.cid);
+            })
+            .catch(function (error) {
+                console.error(error);
+            });
+        },
+    },
+    watch: {
+        admin(val, old) {
+            if (old == false && val == true) app.all_class_info();
+        }
     },
 })
 axios.get('/admin_check')

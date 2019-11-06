@@ -20,44 +20,89 @@ class Error(Enum):
     DatabaseError = "DatabaseError"
     ClassNotFound = "ClassNotFound"
     PasswordError = "PasswordError"
-    AuthenticationRequired = "AuthenticationRequired"
+    AuthRequired = "AuthRequired"
 
 @app.route('/hello')
 def hello_world():
     return 'Hello World'
 
+#
+# Private APIs
+#
 
+#
+# Public APIs
+#
 
-@app.route('/admin_check', methods=['GET'])
 def admin_check():
-    admin = session.get("admin")
-    if admin:
-        return jsonify({
-            "ok": "admin"
-        })
+    return session.get("admin") == True
+@app.route('/admin_check', methods=['GET'])
+def _admin_check():
+    if admin_check():
+        return jsonify({ "ok": "admin" })
     else:
-        return jsonify({
-            "error": Error.AuthenticationRequired.value
-        })
+        return jsonify({ "error": Error.AuthRequired.value })
 
-@app.route('/admin_login', methods=['POST'])
-def admin_login():
-    print(request.form)
-    password = request.form['password']
+def admin_login(password):
     session.permanent = True
-    if password == ADMIN_PASSWORD:
-        session['admin'] = True
-        return jsonify({
-            "ok": "login success"
-        })
+    ret = session['admin'] = (password == ADMIN_PASSWORD)
+    return ret
+@app.route('/admin_login', methods=['POST'])
+def _admin_login():
+    password = request.form['password']
+    if admin_login(password):
+        return jsonify({ "ok": "login success" })
     else:
-        session['admin'] = False
-        return jsonify({
-            "error": Error.PasswordError.value
-        })
+        return jsonify({ "error": Error.PasswordError.value })
+
+def new_class():
+    global conn
+    c = conn.cursor()
+    c.execute("INSERT INTO class (url) VALUES ('')")
+    c.execute("SELECT last_insert_rowid() from class")
+    ret = c.fetchone()[0]
+    conn.commit()
+    return ret
+@app.route('/new_class', methods=['POST'])
+def _new_class():
+    return jsonify({ "cid": new_class() })
 
 if __name__ == "__main__":
     # local test
     app.config['SECRET_KEY'] = b'T\xcfmx\x9b^$\xb0\xc9\xac\x99\xb1\x1eh\xc7\xa2\x1b.>k\xae\xb8$\xb2'
     app.debug = True
+    conn = sqlite3.connect("./shuttlecock.db", check_same_thread=False)
+else:  # production mode
+    conn = sqlite3.connect("~/shuttlecock.db", check_same_thread=False)
+
+def all_class_info():
+    global conn
+    c = conn.cursor()
+    c.execute("SELECT cid, url, note, frozen, create_time from class")
+    classes = []
+    for row in c:
+        classes.append({
+            "cid": row[0],
+            "url": row[1],
+            "note": row[2],
+            "frozen": row[3],
+            "create_time": row[4],
+        })
+    return classes
+@app.route('/all_class_info', methods=['GET'])
+def _all_class_info():
+    return jsonify(all_class_info())
+
+conn.execute('''
+CREATE TABLE IF NOT EXISTS class (
+cid INTEGER PRIMARY KEY AUTOINCREMENT,
+url VARCHAR(16) default '',
+note NVARCHAR(64) default '',
+frozen BOOLEAN default true,
+student_info NVARCHAR(65536) default '{}',
+create_time TIMESTAMP default (datetime('now', 'localtime'))
+);
+''')
+
+if __name__ == "__main__":
     app.run()

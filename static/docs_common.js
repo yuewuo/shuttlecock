@@ -139,8 +139,8 @@ class SqlDatabaseTable {
         return Lw(this.name) + "_" + Lw("\\small{\\left(\\begin{smallmatrix}" + keys_mat + "\\end{smallmatrix}\\right)}");
     }
     to_html() {
-        return `<h4>\\(${this.name}\\):&nbsp;${this.table}</h4>`
-            + `<p>${this.description}</p>`
+        return `<h4 style="display:inline;">\\(${this.name}\\):&nbsp;${this.table}</h4>`
+            + `<p style="display:inline; margin-left: 20px;">${this.description}</p>`
             + "$$" + this.to_latex() + "$$";
     }
 }

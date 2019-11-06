@@ -37,6 +37,20 @@ sys.append_description_specification(new Specification(
 .require_public_api("admin_check")
 );
 
+sys.append_description_specification(new Specification(
+    "管理员可以新建班级", 
+    "返回创建班级的全局唯一cid，之后所有有关班级的操作都是围绕cid进行的"
+)
+.require_public_api("new_class")
+);
+
+sys.append_description_specification(new Specification(
+    "管理员可以查看所有的班级的所有信息，包括已经冻结的", 
+    "返回一个json数组，所有元素包括cid的值"
+)
+.require_public_api("all_class_info")
+);
+
 //
 // Description Specification
 //
@@ -46,15 +60,16 @@ sys.append_description_specification(new Specification(
 // Sql Database Design
 //
 
-let M = new SqlDatabaseTable("C",
+let C = new SqlDatabaseTable("C",
     table="class",
-    description="存储班级信息的表，对<code>cid</code>和<code>name</code>唯一");
-M.append_key("cid", SDTT.INTEGER, unique=true);
-M.append_key("name", Object.assign(SDTT.VARCHAR.concat(), {1:16}), unique=true);
-M.append_key("frozen", SDTT.BOOLEAN);
-M.append_key("student_info", SDTT.JSONB);
-M.append_key("create_time", SDTT.TIMESTAMP);
-sys.append_sql_table(M);
+    description="存储班级信息的表，对<code>cid</code>唯一，且<code>frozen</code>为false的不能有相同的<code>url</code>");
+C.append_key("cid", SDTT.INTEGER, unique=true);
+C.append_key("url", Object.assign(SDTT.VARCHAR.concat(), {1:16}));
+C.append_key("note", Object.assign(SDTT.VARCHAR.concat(), {1:64}));
+C.append_key("frozen", SDTT.BOOLEAN);
+C.append_key("student_info", Object.assign(SDTT.VARCHAR.concat(), {1:65536}));
+C.append_key("create_time", SDTT.TIMESTAMP);
+sys.append_sql_table(C);
 
 //
 // Type Design
@@ -66,13 +81,14 @@ const T = {
         DatabaseError: "E^\\mathtt{DatabaseError}",
         ClassNotFound: "E^\\mathtt{ClassNotFound}",
         PasswordError: "E^\\mathtt{PasswordError}",
-        AuthenticationRequired: "E^\\mathtt{AuthenticationRequired}",
+        AuthRequired: "E^\\mathtt{AuthRequired}",
     },
     Class: {
         collection: "C",
         any: "C^\\mathtt{any}",
+        list: "C^\\mathtt{list}",
         cid: "C^\\mathtt{cid}",
-        name: "C^\\mathtt{name}",
+        url: "C^\\mathtt{url}",
     },
     Session: {
         data: "S",
@@ -86,23 +102,22 @@ sys.set_type(T);
 // Private API Design
 //
 
-let query_class_by_name = new API("query_class_by_name", 
-    description="通过字符串的班级名称来查找班级，并返回完整的班级信息",
+let query_cid_by_url = new API("query_cid_by_url", 
+    description="通过字符串的班级链接来查找班级，返回cid的值",
     proposition = NLP(LPT.DEDUCTION,
-        NLP(LPT.ATOM, T.Class.name),
+        NLP(LPT.ATOM, T.Class.url),
         NLP(LPT.DEDUCTION,
             NLP(LPT.ATOM, T.Class.collection),
             NLP(LPT.TENSOR, 
                 NLP(LPT.ATOM, T.Class.collection),
                 NLP(LPT.PLUS,
                     NLP(LPT.ATOM, T.Error.ClassNotFound),
-                    NLP(LPT.ATOM, T.Class.any),
+                    NLP(LPT.ATOM, T.Class.cid),
                 ),
             ),
         ),
     ),
-); sys.append_private_api(query_class_by_name);
-
+); sys.append_private_api(query_cid_by_url);
 
 //
 // Public API Design
@@ -132,12 +147,53 @@ let admin_check = new API("admin_check",
         NLP(LPT.TENSOR,
             NLP(LPT.ATOM, T.Session.data),
             NLP(LPT.PLUS,
-                NLP(LPT.ATOM, T.Error.AuthenticationRequired),
+                NLP(LPT.ATOM, T.Error.AuthRequired),
                 NLP(LPT.TENSOR_UNIT),
             ),
         ),
     ),
 ); sys.append_public_api(admin_check);
+
+function auth_required(next) {
+    return NLP(LPT.DEDUCTION,
+        NLP(LPT.ATOM, T.Session.data),
+        NLP(LPT.TENSOR,
+            NLP(LPT.ATOM, T.Session.data),
+            NLP(LPT.PLUS,
+                NLP(LPT.ATOM, T.Error.AuthRequired),
+                next,
+            ),
+        ),
+    );
+}
+
+let new_class = new API("new_class",
+    description="创建班级，一旦创建则不可删除；除<code>cid</code>其他字段均可改动",
+    proposition = auth_required(
+        NLP(LPT.DEDUCTION,
+            NLP(LPT.ATOM, T.Class.collection),
+            NLP(LPT.TENSOR,
+                NLP(LPT.OPERATION, 
+                    NLP(LPT.ATOM, T.Class.collection),
+                    "\\cup default"),
+                NLP(LPT.ATOM, T.Class.cid),
+            ),
+        ),
+    ),
+); sys.append_public_api(new_class);
+
+let all_class_info = new API("all_class_info",
+    description="获取当前数据库所有班级的信息",
+    proposition = auth_required(
+        NLP(LPT.DEDUCTION,
+            NLP(LPT.ATOM, T.Class.collection),
+            NLP(LPT.TENSOR,
+                NLP(LPT.ATOM, T.Class.collection),
+                NLP(LPT.ATOM, T.Class.list),
+            ),
+        ),
+    ),
+); sys.append_public_api(all_class_info);
 
 $(function() {
     sys.render();
