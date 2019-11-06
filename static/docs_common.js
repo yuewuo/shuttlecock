@@ -4,6 +4,7 @@ function Lw(x) { return "{"+(x==undefined?("\\color{red}{\\mathbf{undefined}}"):
 function Red(x) { return "\\color{red}"+Lw(x); }
 function Green(x) { return "\\color{green}"+Lw(x); }
 function Uni(x) { return x; }
+function Mathtt(x) { return "\\mathtt" + Lw(x); }
 
 /*
  * Logic System
@@ -13,7 +14,10 @@ class System {
     constructor(template) {
         this.sql_tables = [];
         this.private_apis = [];
+        this.public_apis = [];
         this.template = template;
+        this.operational_specifications = [];
+        this.description_specifications = [];
     }
     append_sql_table(table) {
         console.assert(SqlDatabaseTable.prototype.isPrototypeOf(table), "type error");
@@ -22,6 +26,18 @@ class System {
     append_private_api(private_api) {
         console.assert(API.prototype.isPrototypeOf(private_api), "type error");
         this.private_apis.push(private_api);
+    }
+    append_public_api(public_api) {
+        console.assert(API.prototype.isPrototypeOf(public_api), "type error");
+        this.public_apis.push(public_api);
+    }
+    append_operational_specification(spec) {
+        console.assert(Specification.prototype.isPrototypeOf(spec), "type error");
+        this.operational_specifications.push(spec);
+    }
+    append_description_specification(spec) {
+        console.assert(Specification.prototype.isPrototypeOf(spec), "type error");
+        this.description_specifications.push(spec);
     }
     flatten_values(obj) {
         let values = [];
@@ -45,16 +61,31 @@ class System {
     }
     render() {
         $("#write").html(this.template);
+        let operational_specification_html = "";
+        for (let i=0; i<this.operational_specifications.length; ++i) {
+            operational_specification_html += this.operational_specifications[i].to_html(this);
+        }
+        $("#operational_specification").html(operational_specification_html);
+        let description_specification_html = "";
+        for (let i=0; i<this.description_specifications.length; ++i) {
+            description_specification_html += this.description_specifications[i].to_html(this);
+        }
+        $("#description_specification").html(description_specification_html);
         let database_design_html = "";
         for (let i=0; i<this.sql_tables.length; ++i) {
-            database_design_html += this.sql_tables[i].to_html();
+            database_design_html += this.sql_tables[i].to_html(this);
         }
         $("#database_design").html(database_design_html);
         let private_apis_html = "";
         for (let i=0; i<this.private_apis.length; ++i) {
-            private_apis_html += this.private_apis[i].to_html();
+            private_apis_html += this.private_apis[i].to_html(this);
         }
         $("#private_APIs").html(private_apis_html);
+        let public_apis_html = "";
+        for (let i=0; i<this.public_apis.length; ++i) {
+            public_apis_html += this.public_apis[i].to_html(this);
+        }
+        $("#public_APIs").html(public_apis_html);
     }
 }
 
@@ -128,6 +159,7 @@ const LinearPropositionType = {
     PLUS_UNIT: 9,  // 0
     WITH_UNIT: 10,  // ⊤,
     PAR_UNIT: 11,  // ⊥
+    OPERATION: 12,  // subscript representing operation on object
 };
 const LPT = LinearPropositionType;
 
@@ -144,6 +176,7 @@ class LinearProposition {
         if (this.type == LPT.PLUS_UNIT) return true;
         if (this.type == LPT.WITH_UNIT) return true;
         if (this.type == LPT.PAR_UNIT) return true;
+        if (this.type == LPT.OPERATION) return true;
         return false;
     }
     to_latex() {
@@ -190,6 +223,14 @@ class LinearProposition {
             }
             return s;
         }
+        if (this.type == LPT.OPERATION) {
+            console.assert(this.args[0].type == LPT.ATOM, "operation only allowed on atoms");
+            console.assert(this.args.length >= 2 && "empty operation list not allowed");
+            let s = this.args[0].to_latex() + "_{" + Mathtt(this.args[1]);
+            for (let i=2; i<this.args.length; ++i) s += ";" + Mathtt(this.args[i]);
+            s += "}";
+            return s;
+        }
         console.assert(false, "type not supported");
         return "\\mathtt{\\color{red}{UNKNOWN}}"
     }
@@ -202,14 +243,48 @@ class API {
         this.description = description;
         this.proposition = proposition;
     }
+    to_proposition_latex() {
+        return new LinearProposition(LinearPropositionType.BANG, this.proposition, null).to_latex();
+    }
     to_html() {
         let proposition_latex = "\\mathtt{\\color{red}{INVALID\\_PROPOSITION}}";
         if (this.proposition) {
             console.assert(LinearProposition.prototype.isPrototypeOf(this.proposition), "type error");
-            proposition_latex = new LinearProposition(LinearPropositionType.BANG, this.proposition, null).to_latex();
+            proposition_latex = this.to_proposition_latex();
         }
-        return `<h4>${this.name}</h4>`
-            + `<p>${this.description}</p>`
+        return `<h4 style="display:inline;" id="api_${this.name}">${this.name}</h4>`
+            + `<p style="display:inline; margin-left: 20px;">${this.description}</p>`
             + "$$" + proposition_latex + "$$";
+    }
+}
+
+class Specification {
+    constructor(title, content) {
+        this.title = title;
+        this.content = content;
+        this.required_public_apis = [];
+    }
+    require_public_api(name) {
+        this.required_public_apis.push(name);
+        return this;
+    }
+    to_html(sys) {
+        let require_public_api_html = "";
+        for (let i in this.required_public_apis) {
+            let required_public_api = this.required_public_apis[i];
+            let found = undefined;
+            for (let j in sys.public_apis) {
+                let api = sys.public_apis[j];
+                if (api.name == required_public_api) { found = api; break; }
+            }
+            require_public_api_html += `<blockquote>
+            <p>${found?"<a href='#api_"+required_public_api+"'>":"<strong style='color:red'>"
+            }${required_public_api}${found?"<span style='margin-left: 20px;'>\\("+found.to_proposition_latex()+"\\)</span></a>":""}</p>
+            </blockquote>
+            `;
+        }
+        return `<h4>${this.title}</h4>`
+            + `<p>${this.content}</p>`
+            + require_public_api_html;
     }
 }

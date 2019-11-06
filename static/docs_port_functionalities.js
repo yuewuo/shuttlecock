@@ -18,6 +18,31 @@ html_template =  `
 var sys = new System(template=html_template);
 
 //
+// Operational Specification
+//
+
+sys.append_description_specification(new Specification(
+    "存在管理员，可通过密码登录", 
+    "为了有效保护管理员的密码，网站服务器需要使用https，本系统仅针对https保护的服务器设计，除此之外不提供安全保证！" + 
+    "管理员的密码需要通过后台设置，为了简化设计，这里采用全局唯一的密码，密码设置在应用中固定，默认为admin，用户必须手动修改" + 
+    "<code>application.py</code>中的<code>ADMIN_PASSWORD</code>字符串变量来重置密码"
+)
+.require_public_api("admin_login")
+);
+
+sys.append_description_specification(new Specification(
+    "用户可以得知自己是否拥有管理员权限", 
+    "前端程序可以根据这个API来决定是否在某些情况下请求用户输入密码以登录"
+)
+.require_public_api("admin_check")
+);
+
+//
+// Description Specification
+//
+
+
+//
 // Sql Database Design
 //
 
@@ -37,15 +62,23 @@ sys.append_sql_table(M);
 
 const T = {
     Error: {
+        NotImplement: "E^\\mathtt{NotImplement}",
         DatabaseError: "E^\\mathtt{DatabaseError}",
         ClassNotFound: "E^\\mathtt{ClassNotFound}",
+        PasswordError: "E^\\mathtt{PasswordError}",
+        AuthenticationRequired: "E^\\mathtt{AuthenticationRequired}",
     },
     Class: {
         collection: "C",
         any: "C^\\mathtt{any}",
         cid: "C^\\mathtt{cid}",
         name: "C^\\mathtt{name}",
-    }
+    },
+    Session: {
+        data: "S",
+        admin: "S^\\mathtt{admin}",
+    },
+    Password: "P",
 };
 sys.set_type(T);
 
@@ -69,6 +102,42 @@ let query_class_by_name = new API("query_class_by_name",
         ),
     ),
 ); sys.append_private_api(query_class_by_name);
+
+
+//
+// Public API Design
+//
+
+let admin_login = new API("admin_login",
+    description="通过密码登录，并存储在session里面以供之后使用（错误的密码会另session失效）",
+    proposition = NLP(LPT.DEDUCTION,
+        NLP(LPT.ATOM, T.Password),
+        NLP(LPT.DEDUCTION,
+            NLP(LPT.ATOM, T.Session.data),
+            NLP(LPT.TENSOR,
+                NLP(LPT.OPERATION, NLP(LPT.ATOM, T.Session.data), "admin=?"),
+                NLP(LPT.PLUS,
+                    NLP(LPT.ATOM, T.Error.PasswordError),
+                    NLP(LPT.TENSOR_UNIT),
+                ),
+            ),
+        ),
+    ),
+); sys.append_public_api(admin_login);
+
+let admin_check = new API("admin_check",
+    description="如果session里存在<code>admin=true</code>返回1，否则返回AuthenticationRequired错误",
+    proposition = NLP(LPT.DEDUCTION,
+        NLP(LPT.ATOM, T.Session.data),
+        NLP(LPT.TENSOR,
+            NLP(LPT.ATOM, T.Session.data),
+            NLP(LPT.PLUS,
+                NLP(LPT.ATOM, T.Error.AuthenticationRequired),
+                NLP(LPT.TENSOR_UNIT),
+            ),
+        ),
+    ),
+); sys.append_public_api(admin_check);
 
 $(function() {
     sys.render();

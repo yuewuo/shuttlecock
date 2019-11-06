@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>后台管理</title>
+    <link rel="stylesheet" href="./css/element.css">
+</head>
+<body>
+<div id="app" style="max-width: 800px; margin: 0 auto 0 auto;">
+    <h1>后台管理</h1>
+    <p style="line-height: 50px;">管理员状态：
+        <strong :style="{color: admin?'green':'red'}">{{ admin?"已登录":"未登陆" }}</strong>
+        <span v-show="!admin">
+            <el-input v-model="password" placeholder="管理员密码" style="width: 200px; margin-left: 20px;"></el-input>
+            <el-button type="primary" :loading="login_ing" @click="login()">{{ login_hint }}</el-button>
+        </span>
+        <span v-show="admin">
+            <el-button type="danger" @click="unlogin()">退出登录</el-button>
+        </span>
+    </p>
+</div>
+<script src="./js/vue.dev.js"></script>
+<!-- <script src="./js/vue.js"></script> -->
+<script src="./js/axios.min.js"></script>
+<script src="./js/element.js"></script>
+<script>
+var app = new Vue({
+    el: '#app',
+    data: {
+        admin: false,
+        password: "",
+        login_ing: false,
+        login_hint: "登录",
+    },
+    methods: {
+        login() {
+            app.login_ing = true;
+            let data = new FormData();
+            data.append('password', app.password);
+            return axios.post('/admin_login', data)
+            .then(function (response) {
+                if ('error' in response.data) {
+                    app.login_hint = "错误：" + response.data.error;
+                    app.admin = false;
+                } else {
+                    app.login_hint = "登录";
+                    app.admin = true;
+                    app.password = "";
+                }
+                console.log(response);
+                app.login_ing = false;
+            })
+            .catch(function (error) {
+                console.error(error);
+                app.login_hint = "API错误";
+                app.login_ing = false;
+                app.admin = false;
+            });
+        },
+        unlogin() {
+            app.password = "";
+            app.login().then(function () {
+                app.login_hint = "登录";
+            });
+        },
+    },
+})
+axios.get('/admin_check')
+.then(function (response) {
+    if ('ok' in response.data) {
+        app.admin = true;
+    }
+})
+.catch(function (error) {
+    console.error(error);
+});
+</script>
+</body>
+</html>
