@@ -21,7 +21,7 @@ var sys = new System(template=html_template);
 // Operational Specification
 //
 
-sys.append_description_specification(new Specification(
+sys.append_operational_specification(new Specification(
     "存在管理员，可通过密码登录", 
     "为了有效保护管理员的密码，网站服务器需要使用https，本系统仅针对https保护的服务器设计，除此之外不提供安全保证！" + 
     "管理员的密码需要通过后台设置，为了简化设计，这里采用全局唯一的密码，密码设置在应用中固定，默认为admin，用户必须手动修改" + 
@@ -30,28 +30,28 @@ sys.append_description_specification(new Specification(
 .require_public_api("admin_login")
 );
 
-sys.append_description_specification(new Specification(
+sys.append_operational_specification(new Specification(
     "用户可以得知自己是否拥有管理员权限", 
     "前端程序可以根据这个API来决定是否在某些情况下请求用户输入密码以登录"
 )
 .require_public_api("admin_check")
 );
 
-sys.append_description_specification(new Specification(
+sys.append_operational_specification(new Specification(
     "管理员可以新建班级", 
     "返回创建班级的全局唯一cid，之后所有有关班级的操作都是围绕cid进行的"
 )
 .require_public_api("new_class")
 );
 
-sys.append_description_specification(new Specification(
+sys.append_operational_specification(new Specification(
     "管理员可以查看所有的班级的所有信息，包括已经冻结的", 
     "返回一个json数组，所有元素包括cid的值"
 )
 .require_public_api("all_class_info")
 );
 
-sys.append_description_specification(new Specification(
+sys.append_operational_specification(new Specification(
     "管理员可以冻结和解锁班级，比如已经结束的学期应当冻结，随时可以恢复", 
     "可能返回几种错误，见下列API"
 )
@@ -59,11 +59,25 @@ sys.append_description_specification(new Specification(
 .require_public_api("unfreeze_class")
 );
 
-sys.append_description_specification(new Specification(
+sys.append_operational_specification(new Specification(
     "管理员可以修改班级的url和描述信息", 
     "url为最多16个英文和数字字符，描述信息可以是65536个字符的任意信息，包括中文"
 )
 .require_public_api("modify_class")
+);
+
+sys.append_operational_specification(new Specification(
+    "管理员可以获取某一个班级的所有学生信息", 
+    "输出为一个列表对象，每一项代表一名学生，每一项里面包含<code>n</code>姓名和可选的<code>d</code>描述信息"
+)
+.require_public_api("all_student_info")
+);
+
+sys.append_operational_specification(new Specification(
+    "管理员可以修改一个班级的所有学生信息", 
+    "给定一个字符串的Json数据，修改数据库项目；这个步骤是不可逆的，丢失的信息无法追回，除非有其他备份方式"
+)
+.require_public_api("modify_student_info")
 );
 
 //
@@ -92,6 +106,7 @@ sys.append_sql_table(C);
 
 const T = {
     Error: {
+        any: "E^\\mathtt{any}",
         NotImplement: "E^\\mathtt{NotImplement}",
         DatabaseError: "E^\\mathtt{DatabaseError}",
         ClassNotFound: "E^\\mathtt{ClassNotFound}",
@@ -99,6 +114,8 @@ const T = {
         AuthRequired: "E^\\mathtt{AuthRequired}",
         UrlInUse: "E^\\mathtt{UrlInUse}",
         FrozenRequired: "E^\\mathtt{FrozenRequired}",
+        CidError: "E^\\mathtt{CidError}",
+        JsonFormatError: "E^\\mathtt{JsonFormatError}",
     },
     Class: {
         collection: "C",
@@ -107,10 +124,11 @@ const T = {
         cid: "C^\\mathtt{cid}",
         url: "C^\\mathtt{url}",
         note: "C^\\mathtt{note}",
+        student: "C^\\mathtt{student}"
     },
     Session: {
-        data: "S",
-        admin: "S^\\mathtt{admin}",
+        data: "s",
+        admin: "s^\\mathtt{admin}",
     },
     Password: "P",
 };
@@ -283,7 +301,52 @@ let modify_class = new API("modify_class",
     ),
 ); sys.append_public_api(modify_class);
 
-modify_class
+let all_student_info = new API("all_student_info",
+    description="获取班级的学生信息",
+    proposition = NLP(LPT.DEDUCTION,
+        NLP(LPT.ATOM, T.Class.cid),
+        auth_required(
+            NLP(LPT.DEDUCTION,
+                NLP(LPT.ATOM, T.Class.collection),
+                NLP(LPT.TENSOR,
+                    NLP(LPT.ATOM, T.Class.collection),
+                    NLP(LPT.PLUS,
+                        NLP(LPT.ATOM, T.Error.CidError),
+                        NLP(LPT.ATOM, T.Class.student),
+                    ),
+                ),
+            ),
+        ),
+    ),
+); sys.append_public_api(all_student_info);
+
+let modify_student_info = new API("modify_student_info",
+    description="修改班级的学生信息，保证插入的是合法Json数据；要求班级处于被冻结状态才能修改",
+    proposition = NLP(LPT.DEDUCTION,
+        NLP(LPT.TENSOR,
+            NLP(LPT.ATOM, T.Class.cid),
+            NLP(LPT.ATOM, T.Class.student),
+        ),
+        auth_required(
+            NLP(LPT.DEDUCTION,
+                NLP(LPT.ATOM, T.Class.collection),
+                NLP(LPT.PLUS,
+                    NLP(LPT.TENSOR,
+                        NLP(LPT.ATOM, T.Class.collection),
+                        NLP(LPT.ATOM, T.Error.any),
+                    ),
+                    NLP(LPT.TENSOR,
+                        NLP(LPT.OPERATION, 
+                            NLP(LPT.ATOM, T.Class.collection),
+                            "\\{student\\_info=?|cid\\}",
+                        ),
+                        NLP(LPT.TENSOR_UNIT),
+                    ),
+                ),
+            ),
+        ),
+    ),
+); sys.append_public_api(modify_student_info);
 
 $(function() {
     sys.render();

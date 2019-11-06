@@ -1,7 +1,7 @@
 from flask import Flask, jsonify, session, request
 from enum import Enum
 from datetime import timedelta
-import sqlite3, os
+import sqlite3, os, json
 
 ADMIN_PASSWORD = "123456"
 
@@ -25,6 +25,7 @@ class Error(Enum):
     DataTooLong = "DataTooLong"
     DataFormatError = "DataFormatError"
     CannotUnfreeze = "CannotUnfreeze"
+    CidError = "CidError"
 
 @app.route('/hello')
 def hello_world():
@@ -143,6 +144,35 @@ def _modify_class():
     note = request.form['note']
     return jsonify(modify_class(cid, url, note))
 
+def all_student_info(cid):
+    if not admin_check():
+        return { "error": Error.AuthRequired.value }
+    global conn
+    c = conn.cursor()
+    c.execute("SELECT student_info FROM class WHERE cid = %d" % cid)
+    ret = c.fetchone()
+    if ret is None:
+        return { "error": Error.CidError.value }
+    return json.loads(ret[0])
+@app.route('/all_student_info/<int:cid>', methods=['GET'])
+def _all_student_info(cid):
+    return jsonify(all_student_info(cid))
+
+def modify_student_info(cid, student_info):
+    if not admin_check():
+        return { "error": Error.AuthRequired.value }
+    global conn
+    c = conn.cursor()
+    c.execute("UPDATE class set student_info = ? WHERE cid = %d AND frozen = true" % (cid), (student_info,))
+    conn.commit()
+    return {}
+@app.route('/modify_student_info', methods=['POST'])
+def _modify_student_info():
+    cid = int(request.form['cid'])
+    student_info = request.form['student_info']
+    json.loads(student_info)  # just to test Json format
+    return jsonify(modify_student_info(cid, student_info))
+
 #
 # configuration
 #
@@ -161,7 +191,7 @@ cid INTEGER PRIMARY KEY AUTOINCREMENT,
 url VARCHAR(16) default '',
 note NVARCHAR(64) default '',
 frozen BOOLEAN default true,
-student_info NVARCHAR(65536) default '{}',
+student_info NVARCHAR(65536) default '[]',
 create_time TIMESTAMP default (datetime('now', 'localtime'))
 );
 ''')

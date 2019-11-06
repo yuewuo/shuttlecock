@@ -6,6 +6,11 @@
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
     <title>后台管理</title>
     <link rel="stylesheet" href="./css/element.css">
+<style>
+.el-table .success-row {
+    background: #f0f9eb;
+}
+</style>
 </head>
 <body>
 <div id="app" style="max-width: 900px; margin: 0 auto 0 auto;">
@@ -24,7 +29,7 @@
         <strong style="margin-left: 20px">新建班级编号<code>cid</code>：{{ new_class_cid }}</strong>
         <el-button v-show="class_dirty" type="danger" @click="all_class_info()" style="margin-left: 20px;">班级信息已被修改，点击刷新</el-button>
     </p>
-    <el-table :data="all_class_info_ret" style="width: 100%">
+    <el-table :data="all_class_info_ret" style="width: 100%" :row-class-name="tableRowClassName" border>
         <el-table-column label="cid" width="50">
         <template slot-scope="scope">
             {{ scope.row.cid }}
@@ -44,16 +49,42 @@
         </el-table-column>
         <el-table-column label="描述信息">
         <template slot-scope="scope">
-            <el-input type="textarea" :rows="2" placeholder="请输入内容" v-model="scope.row.note" v-on:input="class_dirty=true;scope.row.dirty=true"
+            <el-input type="textarea" :rows="1" placeholder="请输入内容" v-model="scope.row.note" v-on:input="class_dirty=true;scope.row.dirty=true"
                 :disabled="scope.row.frozen==0"></el-input>
         </template>
         </el-table-column>
         <el-table-column label="操作">
         <template slot-scope="scope">
-            <el-button size="mini" type="primary" @click="alert(1)">学生名单</el-button>
+            <el-button size="mini" type="primary" @click="student_cid=scope.row.cid" :disabled="student_cid==scope.row.cid">学生名单</el-button>
             <el-button v-show="scope.row.frozen==0" :disabled="scope.row.dirty" size="mini" type="danger" @click="freeze_class(scope.row.cid)">冻结</el-button>
             <el-button v-show="scope.row.frozen==1" :disabled="scope.row.dirty" size="mini" type="success" @click="unfreeze_class(scope.row.cid)">解锁</el-button>
             <el-button :disabled="!scope.row.dirty" size="mini" type="warning" @click="modify_class(scope.row.cid, scope.row.url, scope.row.note)">更新</el-button>
+        </template>
+        </el-table-column>
+    </el-table>
+    <h2>学生名单（cid={{student_cid}}）</h2>
+    </p>
+        <el-button type="success" :disabled="student_cid==-1||!admin" @click="all_student_info()">刷新学生列表</el-button>
+        <el-button type="warning" :disabled="student_cid==-1||!student_dirty||!admin" @click="modify_student_info()">更新学生数据</el-button>
+        <el-input placeholder="新增学生姓名" v-model="new_student_name" style="width: 200px; margin-left: 20px;"></el-input>
+        <el-input type="textarea" :rows="1" placeholder="描述信息（选填）" v-model="new_student_description" style="width: 200px; margin-left: 10px;"></el-input>
+        <el-button type="primary" :disabled="student_cid==-1||!admin" @click="new_student()">增加学生</el-button>
+    </p>
+    <el-table :data="students" style="width: 100%" border>
+        <el-table-column label="姓名">
+        <template slot-scope="scope">
+            {{ scope.row.n }}
+        </template>
+        </el-table-column>
+        <el-table-column label="描述信息">
+        <template slot-scope="scope">
+            <el-input type="textarea" :rows="1" placeholder="请输入内容" v-model="scope.row.d" v-on:input="student_dirty=true"></el-input>
+        </template>
+        </el-table-column>
+        <el-table-column label="操作">
+        <template slot-scope="scope">
+            <el-button size="mini" type="primary" @click="view_student(scope.row.n)">查看数据</el-button>
+            <el-button :disabled="student_dirty" size="mini" type="danger" @click="delete_student(scope.row.n)">删除（无法恢复）{{delete_cnt?"("+delete_cnt+")":""}}</el-button>
         </template>
         </el-table-column>
     </el-table>
@@ -73,6 +104,13 @@ var app = new Vue({
         new_class_cid: -1,
         all_class_info_ret: [],
         class_dirty: false,
+        student_cid: -1,
+        students: [],
+        student_dirty: false,
+        delete_cnt: null,
+        delete_timer: null,
+        new_student_name: "",
+        new_student_description: "",
     },
     methods: {
         login() {
@@ -97,6 +135,10 @@ var app = new Vue({
                 app.login_ing = false;
                 app.admin = false;
             });
+        },
+        tableRowClassName({row, rowIndex}) {
+            if (row.cid == app.student_cid) return 'success-row';
+            return '';
         },
         unlogin() {
             app.password = "";
@@ -191,11 +233,105 @@ var app = new Vue({
                 console.error(error);
             });
         },
+        clear_student() {
+            app.student_cid = -1;
+            app.students = [];
+        },
+        all_student_info() {
+            if (app.student_cid < 0) {
+                app.student_dirty = false; return;
+            }
+            return axios.get('/all_student_info/' + app.student_cid)
+            .then(function (response) {
+                if ('error' in response.data) {
+                    app.$alert('错误代码：' + response.data.error, '出现错误');
+                } else {
+                    let v = response.data.sort((a,b)=>(b.n>a.n)?1:-1);  // 按名字排序
+                    for (let i in v) v[i].d = "";
+                    app.students = v;
+                }
+                app.student_dirty = false;
+            })
+            .catch(function (error) {
+                console.error(error);
+            });
+        },
+        modify_student_info() {
+            let v = [];
+            for (let i in app.students) {
+                let o = {n: app.students[i].n}
+                if (app.students[i].d.length > 0) o.d = app.students[i].d;
+                v.push(o);
+            }
+            console.log(v);
+            let data = new FormData();
+            data.append('cid', app.student_cid);
+            data.append('student_info', JSON.stringify(v));
+            return axios.post('/modify_student_info', data)
+            .then(function (response) {
+                app.all_student_info();
+                if ('error' in response.data) {
+                    app.$alert('错误代码：' + response.data.error, '出现错误');
+                } else {
+                    app.$notify({
+                        title: '执行成功', type: 'success',
+                        message: "学生信息已修改"
+                    });
+                }
+            })
+            .catch(function (error) {
+                console.error(error);
+            });
+        },
+        delete_student(n) {
+            if (this.delete_cnt == null) {
+				this.delete_cnt = 5;
+				clearTimeout(this.delete_timer);
+				this.delete_timer = setTimeout(function() {
+					app.delete_cnt = null;
+				}, 3000);
+				return;
+			} else if (this.delete_cnt > 1) {
+				this.delete_cnt -= 1;
+				clearTimeout(this.delete_timer);
+				this.delete_timer = setTimeout(function() {
+					app.delete_cnt = null;
+				}, 3000);
+				return;
+            }
+            for (let i=0; i<this.students.length; ++i) {
+                if (this.students[i].n == n) {
+                    this.students.splice(i, 1); --i
+                }
+            }
+			this.delete_cnt = null;
+            app.student_dirty = true;
+            app.modify_student_info();
+        },
+        new_student() {
+            if (app.new_student_name.length < 1) { app.$alert('姓名不能为空', '出现错误'); return; }
+            if (app.new_student_name > 16) { app.$alert('姓名过长', '出现错误'); return; }
+            for (let i=0; i<this.students.length; ++i) {
+                if (this.students[i].n == app.new_student_name) {
+                    app.$alert('不能新增同名学生', '出现错误'); return;
+                }
+            }
+            app.students.push({
+                n: app.new_student_name,
+                d: app.new_student_description,
+            });
+            app.student_dirty = true;
+            app.modify_student_info();
+        },
     },
     watch: {
         admin(val, old) {
             if (old == false && val == true) app.all_class_info();
-        }
+        },
+        student_cid(val, old) {
+            app.students = [];
+            app.all_student_info();
+        },
     },
 })
 axios.get('/admin_check')
