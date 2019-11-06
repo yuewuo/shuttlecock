@@ -21,6 +21,10 @@ class Error(Enum):
     ClassNotFound = "ClassNotFound"
     PasswordError = "PasswordError"
     AuthRequired = "AuthRequired"
+    FrozenRequired = "FrozenRequired"
+    DataTooLong = "DataTooLong"
+    DataFormatError = "DataFormatError"
+    CannotUnfreeze = "CannotUnfreeze"
 
 @app.route('/hello')
 def hello_world():
@@ -51,9 +55,9 @@ def admin_login(password):
 def _admin_login():
     password = request.form['password']
     if admin_login(password):
-        return jsonify({ "ok": "login success" })
+        return { "ok": "login success" }
     else:
-        return jsonify({ "error": Error.PasswordError.value })
+        return { "error": Error.PasswordError.value }
 
 def new_class():
     global conn
@@ -67,15 +71,9 @@ def new_class():
 def _new_class():
     return jsonify({ "cid": new_class() })
 
-if __name__ == "__main__":
-    # local test
-    app.config['SECRET_KEY'] = b'T\xcfmx\x9b^$\xb0\xc9\xac\x99\xb1\x1eh\xc7\xa2\x1b.>k\xae\xb8$\xb2'
-    app.debug = True
-    conn = sqlite3.connect("./shuttlecock.db", check_same_thread=False)
-else:  # production mode
-    conn = sqlite3.connect("~/shuttlecock.db", check_same_thread=False)
-
 def all_class_info():
+    if not admin_check():
+        return { "error": Error.AuthRequired.value }
     global conn
     c = conn.cursor()
     c.execute("SELECT cid, url, note, frozen, create_time from class")
@@ -92,6 +90,70 @@ def all_class_info():
 @app.route('/all_class_info', methods=['GET'])
 def _all_class_info():
     return jsonify(all_class_info())
+
+def freeze_class(cid):
+    if not admin_check():
+        return { "error": Error.AuthRequired.value }
+    global conn
+    c = conn.cursor()
+    c.execute("UPDATE class set frozen = true where cid = %d" % cid)
+    conn.commit()
+    return {}
+@app.route('/freeze_class', methods=['POST'])
+def _freeze_class():
+    cid = int(request.form['cid'])
+    return jsonify(freeze_class(cid))
+    
+def unfreeze_class(cid):
+    if not admin_check():
+        return { "error": Error.AuthRequired.value }
+    global conn
+    c = conn.cursor()
+    c.execute("""UPDATE class set frozen = false WHERE cid = %d AND url != '' AND
+        NOT EXISTS(SELECT * from class WHERE
+            cid != %d AND frozen = false AND
+            url IN (SELECT url FROM class WHERE cid = %d))""" % (cid, cid, cid))
+    c.execute("SELECT frozen FROM class WHERE cid = %d" % cid)
+    frozen = c.fetchone()[0]
+    conn.commit()
+    if frozen == 1:
+        return { "error": Error.CannotUnfreeze.value }
+    return {}
+@app.route('/unfreeze_class', methods=['POST'])
+def _unfreeze_class():
+    cid = int(request.form['cid'])
+    return jsonify(unfreeze_class(cid))
+
+def modify_class(cid, url, note):
+    if not admin_check():
+        return { "error": Error.AuthRequired.value }
+    if len(url) > 16 or len(note) > 65536:
+        return { "error": Error.DataTooLong.value }
+    if not url.encode("UTF-8").isalnum():
+        return { "error": Error.DataFormatError.value }
+    global conn
+    c = conn.cursor()
+    c.execute("UPDATE class set url = ? , note = ? WHERE cid = %d AND frozen = true" % (cid), (url, note))
+    conn.commit()
+    return {}
+@app.route('/modify_class', methods=['POST'])
+def _modify_class():
+    cid = int(request.form['cid'])
+    url = request.form['url']
+    note = request.form['note']
+    return jsonify(modify_class(cid, url, note))
+
+#
+# configuration
+#
+
+if __name__ == "__main__":
+    # local test
+    app.config['SECRET_KEY'] = b'T\xcfmx\x9b^$\xb0\xc9\xac\x99\xb1\x1eh\xc7\xa2\x1b.>k\xae\xb8$\xb2'
+    app.debug = True
+    conn = sqlite3.connect("./shuttlecock.db", check_same_thread=False)
+else:  # production mode
+    conn = sqlite3.connect("/home/admin/shuttlecock.db", check_same_thread=False)
 
 conn.execute('''
 CREATE TABLE IF NOT EXISTS class (

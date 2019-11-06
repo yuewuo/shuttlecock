@@ -8,7 +8,7 @@
     <link rel="stylesheet" href="./css/element.css">
 </head>
 <body>
-<div id="app" style="max-width: 800px; margin: 0 auto 0 auto;">
+<div id="app" style="max-width: 900px; margin: 0 auto 0 auto;">
     <h1>后台管理</h1>
     <p style="line-height: 50px;">管理员状态：
         <strong :style="{color: admin?'green':'red'}">{{ admin?"已登录":"未登陆" }}</strong>
@@ -22,6 +22,7 @@
     </p>
         <el-button type="success" :loading="login_ing" @click="new_class()">新建班级</el-button>
         <strong style="margin-left: 20px">新建班级编号<code>cid</code>：{{ new_class_cid }}</strong>
+        <el-button v-show="class_dirty" type="danger" @click="all_class_info()" style="margin-left: 20px;">班级信息已被修改，点击刷新</el-button>
     </p>
     <el-table :data="all_class_info_ret" style="width: 100%">
         <el-table-column label="cid" width="50">
@@ -29,27 +30,30 @@
             {{ scope.row.cid }}
         </template>
         </el-table-column>
-        <el-table-column label="创建日期">
+        <el-table-column label="创建日期" width="200">
         <template slot-scope="scope">
             <i class="el-icon-time"></i>
             <span style="margin-left: 10px">{{ scope.row.create_time }}</span>
         </template>
         </el-table-column>
-        <el-table-column label="URL">
+        <el-table-column label="URL" width="150">
         <template slot-scope="scope">
-            <el-input v-model="scope.row.url" placeholder="请输入内容"></el-input>
+            <el-input v-model="scope.row.url" placeholder="请输入内容" v-on:input="class_dirty=true;scope.row.dirty=true;"
+                :disabled="scope.row.frozen==0"></el-input>
         </template>
         </el-table-column>
         <el-table-column label="描述信息">
         <template slot-scope="scope">
-            <el-input type="textarea" :rows="2" placeholder="请输入内容" v-model="scope.row.note"></el-input>
+            <el-input type="textarea" :rows="2" placeholder="请输入内容" v-model="scope.row.note" v-on:input="class_dirty=true;scope.row.dirty=true"
+                :disabled="scope.row.frozen==0"></el-input>
         </template>
         </el-table-column>
         <el-table-column label="操作">
         <template slot-scope="scope">
             <el-button size="mini" type="primary" @click="alert(1)">学生名单</el-button>
-            <el-button v-show="scope.row.frozen==0" size="mini" type="danger" @click="alert(1)">冻结</el-button>
-            <el-button v-show="scope.row.frozen==1" size="mini" type="success" @click="alert(1)">解锁</el-button>
+            <el-button v-show="scope.row.frozen==0" :disabled="scope.row.dirty" size="mini" type="danger" @click="freeze_class(scope.row.cid)">冻结</el-button>
+            <el-button v-show="scope.row.frozen==1" :disabled="scope.row.dirty" size="mini" type="success" @click="unfreeze_class(scope.row.cid)">解锁</el-button>
+            <el-button :disabled="!scope.row.dirty" size="mini" type="warning" @click="modify_class(scope.row.cid, scope.row.url, scope.row.note)">更新</el-button>
         </template>
         </el-table-column>
     </el-table>
@@ -68,6 +72,7 @@ var app = new Vue({
         login_hint: "登录",
         new_class_cid: -1,
         all_class_info_ret: [],
+        class_dirty: false,
     },
     methods: {
         login() {
@@ -112,7 +117,75 @@ var app = new Vue({
         all_class_info() {
             return axios.get('/all_class_info')
             .then(function (response) {
-                app.all_class_info_ret = response.data.sort((a,b)=>b.cid-a.cid);
+                if ('error' in response.data) app.all_class_info_ret = [];
+                else {
+                    let v = response.data.sort((a,b)=>b.cid-a.cid);
+                    for (let i in v) v[i].dirty = false;
+                    app.all_class_info_ret = v;
+                }
+                app.class_dirty = false;
+            })
+            .catch(function (error) {
+                console.error(error);
+            });
+        },
+        freeze_class(cid) {
+            let data = new FormData();
+            data.append('cid', cid);
+            return axios.post('/freeze_class', data)
+            .then(function (response) {
+                app.all_class_info();
+                if ('error' in response.data) {
+                    app.$alert('错误代码：' + response.data.error + "", '出现错误');
+                } else {
+                    app.$notify({
+                        title: '执行成功', type: 'success',
+                        message: "已冻结"
+                    });
+                }
+            })
+            .catch(function (error) {
+                console.error(error);
+            });
+        },
+        unfreeze_class(cid) {
+            let data = new FormData();
+            data.append('cid', cid);
+            return axios.post('/unfreeze_class', data)
+            .then(function (response) {
+                app.all_class_info();
+                if ('error' in response.data) {
+                    app.$alert('错误代码：' + response.data.error + "，请检查是否有相同url的已解锁班级", '出现错误');
+                } else {
+                    app.$notify({
+                        title: '执行成功', type: 'success',
+                        message: "已解锁"
+                    });
+                }
+            })
+            .catch(function (error) {
+                console.error(error);
+            });
+        },
+        modify_class(cid, url, note) {
+            if (url.length > 16) { app.$alert('url不能超过16个字符', '出现错误'); return; }
+            if (note.length > 65536) { app.$alert('描述信息不能超过65536个字符', '出现错误'); return; }
+            if (! /^[A-Za-z0-9]*$/.test(url)) { app.$alert('url只能为英文和数字', '出现错误'); return; }
+            let data = new FormData();
+            data.append('cid', cid);
+            data.append('url', url);
+            data.append('note', note);
+            return axios.post('/modify_class', data)
+            .then(function (response) {
+                app.all_class_info();
+                if ('error' in response.data) {
+                    app.$alert('错误代码：' + response.data.error, '出现错误');
+                } else {
+                    app.$notify({
+                        title: '执行成功', type: 'success',
+                        message: "课程信息已经修改"
+                    });
+                }
             })
             .catch(function (error) {
                 console.error(error);

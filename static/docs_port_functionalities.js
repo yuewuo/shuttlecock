@@ -51,6 +51,21 @@ sys.append_description_specification(new Specification(
 .require_public_api("all_class_info")
 );
 
+sys.append_description_specification(new Specification(
+    "管理员可以冻结和解锁班级，比如已经结束的学期应当冻结，随时可以恢复", 
+    "可能返回几种错误，见下列API"
+)
+.require_public_api("freeze_class")
+.require_public_api("unfreeze_class")
+);
+
+sys.append_description_specification(new Specification(
+    "管理员可以修改班级的url和描述信息", 
+    "url为最多16个英文和数字字符，描述信息可以是65536个字符的任意信息，包括中文"
+)
+.require_public_api("modify_class")
+);
+
 //
 // Description Specification
 //
@@ -82,6 +97,8 @@ const T = {
         ClassNotFound: "E^\\mathtt{ClassNotFound}",
         PasswordError: "E^\\mathtt{PasswordError}",
         AuthRequired: "E^\\mathtt{AuthRequired}",
+        UrlInUse: "E^\\mathtt{UrlInUse}",
+        FrozenRequired: "E^\\mathtt{FrozenRequired}",
     },
     Class: {
         collection: "C",
@@ -89,6 +106,7 @@ const T = {
         list: "C^\\mathtt{list}",
         cid: "C^\\mathtt{cid}",
         url: "C^\\mathtt{url}",
+        note: "C^\\mathtt{note}",
     },
     Session: {
         data: "S",
@@ -194,6 +212,78 @@ let all_class_info = new API("all_class_info",
         ),
     ),
 ); sys.append_public_api(all_class_info);
+
+let freeze_class = new API("freeze_class",
+    description="冻结班级，此操作在有管理员权限下无条件成功",
+    proposition = NLP(LPT.DEDUCTION,
+        NLP(LPT.ATOM, T.Class.cid),
+        auth_required(
+            NLP(LPT.DEDUCTION,
+                NLP(LPT.ATOM, T.Class.collection),
+                NLP(LPT.OPERATION, 
+                    NLP(LPT.ATOM, T.Class.collection),
+                    "\\{frozen=true|cid\\}",
+                ),
+            ),
+        ),
+    ),
+); sys.append_public_api(freeze_class);
+
+let unfreeze_class = new API("unfreeze_class",
+    description="解锁班级，可能会发生几种错误：管理员权限错误、url冲突错误",
+    proposition = NLP(LPT.DEDUCTION,
+        NLP(LPT.ATOM, T.Class.cid),
+        auth_required(
+            NLP(LPT.DEDUCTION,
+                NLP(LPT.ATOM, T.Class.collection),
+                NLP(LPT.PLUS,
+                    NLP(LPT.TENSOR,
+                        NLP(LPT.ATOM, T.Class.collection),
+                        NLP(LPT.ATOM, T.Error.UrlInUse),
+                    ),
+                    NLP(LPT.TENSOR,
+                        NLP(LPT.OPERATION, 
+                            NLP(LPT.ATOM, T.Class.collection),
+                            "\\{frozen=false|cid\\}",
+                        ),
+                        NLP(LPT.TENSOR_UNIT),
+                    ),
+                ),
+            ),
+        ),
+    ),
+); sys.append_public_api(unfreeze_class);
+
+let modify_class = new API("modify_class",
+    description="修改班级信息，要求班级为冻结状态才能够修改",
+    proposition = NLP(LPT.DEDUCTION,
+        NLP(LPT.TENSOR,
+            NLP(LPT.ATOM, T.Class.cid),
+            NLP(LPT.ATOM, T.Class.url),
+            NLP(LPT.ATOM, T.Class.note),
+        ),
+        auth_required(
+            NLP(LPT.DEDUCTION,
+                NLP(LPT.ATOM, T.Class.collection),
+                NLP(LPT.PLUS,
+                    NLP(LPT.TENSOR,
+                        NLP(LPT.ATOM, T.Class.collection),
+                        NLP(LPT.ATOM, T.Error.FrozenRequired),
+                    ),
+                    NLP(LPT.TENSOR,
+                        NLP(LPT.OPERATION, 
+                            NLP(LPT.ATOM, T.Class.collection),
+                            "\\{url',note'|cid\\}",
+                        ),
+                        NLP(LPT.TENSOR_UNIT),
+                    ),
+                ),
+            ),
+        ),
+    ),
+); sys.append_public_api(modify_class);
+
+modify_class
 
 $(function() {
     sys.render();
