@@ -62,13 +62,14 @@
         </template>
         </el-table-column>
     </el-table>
-    <h2>学生名单（cid={{student_cid}}）</h2>
+    <h2>学生名单（cid={{student_cid}}）{{student_cid>0?"（共" + students.length + "人）":""}}</h2>
     </p>
         <el-button type="success" :disabled="student_cid==-1||!admin" @click="all_student_info()">刷新学生列表</el-button>
         <el-button type="warning" :disabled="student_cid==-1||!student_dirty||!admin" @click="modify_student_info()">更新学生数据</el-button>
-        <el-input placeholder="新增学生姓名" v-model="new_student_name" style="width: 200px; margin-left: 20px;"></el-input>
-        <el-input type="textarea" :rows="1" placeholder="描述信息（选填）" v-model="new_student_description" style="width: 200px; margin-left: 10px;"></el-input>
+        <el-input placeholder="新增学生姓名" v-model="new_student_name" style="width: 120px; margin-left: 20px;"></el-input>
+        <el-input type="textarea" :rows="1" placeholder="描述信息（选填）" v-model="new_student_description" style="width: 200px; margin: 0 10px 0 10px;"></el-input>
         <el-button type="primary" :disabled="student_cid==-1||!admin" @click="new_student()">增加学生</el-button>
+        <el-button type="warning" :disabled="student_cid==-1||!admin" @click="dialogFormVisible = true">批量导入学生</el-button>
     </p>
     <el-table :data="students" style="width: 100%" border>
         <el-table-column label="姓名">
@@ -84,10 +85,21 @@
         <el-table-column label="操作">
         <template slot-scope="scope">
             <el-button size="mini" type="primary" @click="view_student(scope.row.n)">查看数据</el-button>
-            <el-button :disabled="student_dirty" size="mini" type="danger" @click="delete_student(scope.row.n)">删除（无法恢复）{{delete_cnt?"("+delete_cnt+")":""}}</el-button>
+            <el-button size="mini" type="danger" @click="delete_student(scope.row.n)">删除（无法恢复）{{delete_cnt?"("+delete_cnt+")":""}}</el-button>
         </template>
         </el-table-column>
     </el-table>
+    <el-dialog title="批量导入学生" :visible.sync="dialogFormVisible">
+        <el-form style="height: 500px;">
+            <el-form-item label="请将学生姓名粘贴至此处，以换行分隔（可以从Excel表格里直接复制姓名的一列）">
+            <el-input type="textarea" :rows="20" v-model="new_student_name_batch" autocomplete="off"></el-input>
+            </el-form-item>
+        </el-form>
+        <div slot="footer" class="dialog-footer">
+            <el-button @click="dialogFormVisible = false">取 消</el-button>
+            <el-button type="primary" @click="new_student_batch();">确 定</el-button>
+        </div>
+    </el-dialog>
 </div>
 <script src="./js/vue.dev.js"></script>
 <!-- <script src="./js/vue.js"></script> -->
@@ -111,6 +123,8 @@ var app = new Vue({
         delete_timer: null,
         new_student_name: "",
         new_student_description: "",
+        new_student_name_batch: "",
+        dialogFormVisible: false,
     },
     methods: {
         login() {
@@ -301,7 +315,7 @@ var app = new Vue({
             }
             for (let i=0; i<this.students.length; ++i) {
                 if (this.students[i].n == n) {
-                    this.students.splice(i, 1); --i
+                    this.students.splice(i, 1); --i;
                 }
             }
 			this.delete_cnt = null;
@@ -322,6 +336,46 @@ var app = new Vue({
             });
             app.student_dirty = true;
             app.modify_student_info();
+        },
+        new_student_batch() {
+            let names = app.new_student_name_batch.split("\n");
+            for (let i in names) names[i].trim();
+            for (let i=0; i<names.length; ++i) {
+                if (names[i].length == 0) { names.splice(i, 1); --i; }
+            }
+            let failed = [];
+            let success = [];
+            let app_students = [];
+            for (let i in app.students) app_students.push(app.students[i])
+            for (let i in names) {
+                if (names[i] > 16) { failed.push(names[i]); continue; }
+                let found_repeat = false;
+                for (let j=0; j<app_students.length; ++j) {
+                    if (app_students[j].n == names[i]) {
+                        found_repeat = true; break;
+                    }
+                }
+                if (found_repeat) {
+                    failed.push(names[i]); continue;
+                }
+                app_students.push({
+                    n: names[i], d: "",
+                });
+                success.push(names[i]);
+            }
+            this.$confirm("共" + names.length + "条记录，成功" + success.length + "条，失败" + failed.length + "条" +
+                    (failed.length != 0 ? "（因为姓名重复或过长，失败列表：" + failed.join("，") + "）" : ""), '提示', {
+                confirmButtonText: '确定',
+                cancelButtonText: '取消',
+                type: 'warning'
+            }).then(() => {
+                app.dialogFormVisible = false
+                app.students = app_students;
+                app.student_dirty = true;
+                app.modify_student_info();
+            }).catch(() => {  // 用户取消
+                // app.dialogFormVisible = false
+            });
         },
     },
     watch: {
