@@ -1,4 +1,9 @@
-var classname = "fri12";
+var classname = function() {
+    let url = window.location.href.toString().split("?")[0];
+    let v = url.split('/');
+    name = v[v.length-1];
+    return name.split(".")[0];
+}();
 
 function update_name() {
     if (longest == 0) {
@@ -50,18 +55,17 @@ function update_today() {
         alert("请按样例输入计时结果，或使用页面内的计时工具自动填写");
         return;
     }
-    $.post("/py/sport/" + classname + "/update", { name, value }, function(data) {
-        // alert(data);
-        if (data == "OK") {
+    $.post("/api/update_today/" + classname, { name, value }, function(data) {
+        if ('ok' in data) {
             alert("更新成功");
             loadcsv(update_name);
-        } else if (data == "ERROR:FORMAT") {
+        } else if (data.error == "ERROR:FORMAT") {
             alert("格式错误，请检查输入格式，例如\"L6R6\"，中间无空格");
-        } else if (data == "ERROR:TIME") {
+        } else if (data.error == "ERROR:TIME") {
             alert("时间错误，请联系管理员处理");
-        } else if (data == "ERROR:NAME") {
+        } else if (data.error == "ERROR:NAME") {
             alert("未找到此姓名，请检查，或联系管理员处理");
-        } else if (data == "ERROR:LOSEARGUMENT") {
+        } else if (data.error == "ERROR:LOSEARGUMENT") {
             alert("API调用异常，请联系管理员处理");
         }
     });
@@ -213,11 +217,11 @@ function loadcsv(callback = null) {
     longest = 1;
     let req = new XMLHttpRequest();
     let nowTime = new Date().getTime(); // to prevent cache of csv file
-    req.open('GET', '/py/sport/' + classname + '.csv?time=' + nowTime, true);
+    req.open('GET', '/api/download_csv/' + classname + '.csv?time=' + nowTime, true);
     req.overrideMimeType('text\/plain; charset=gb2312');  // this costs me 2 hour to make gb2312 work...
     req.onload = function(event) {
         csv = req.response;
-        // console.log(csv);
+        console.log(csv);
         let a = csv.split('\n');
         for (let i=0; i<a.length; ++i) {
             let b = a[i].split(',');
@@ -232,7 +236,7 @@ function loadcsv(callback = null) {
 
 function downloadcsv() {
     let nowTime = new Date().getTime(); // to prevent cache of csv file
-    window.location.href = '/py/sport/' + classname + '.csv?time=' + nowTime
+    window.location.href = "/api/download_csv/" + classname + '.csv?time=' + nowTime
 }
 
 var version = 'version 1910102300';

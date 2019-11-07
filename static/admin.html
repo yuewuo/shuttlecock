@@ -131,7 +131,7 @@ var app = new Vue({
             app.login_ing = true;
             let data = new FormData();
             data.append('password', app.password);
-            return axios.post('/admin_login', data)
+            return axios.post('/api/admin_login', data)
             .then(function (response) {
                 if ('error' in response.data) {
                     app.login_hint = "错误：" + response.data.error;
@@ -161,7 +161,7 @@ var app = new Vue({
             });
         },
         new_class() {
-            return axios.post('/new_class')
+            return axios.post('/api/new_class')
             .then(function (response) {
                 app.new_class_cid = response.data.cid;
                 app.all_class_info();
@@ -171,7 +171,7 @@ var app = new Vue({
             });
         },
         all_class_info() {
-            return axios.get('/all_class_info')
+            return axios.get('/api/all_class_info')
             .then(function (response) {
                 if ('error' in response.data) app.all_class_info_ret = [];
                 else {
@@ -188,7 +188,7 @@ var app = new Vue({
         freeze_class(cid) {
             let data = new FormData();
             data.append('cid', cid);
-            return axios.post('/freeze_class', data)
+            return axios.post('/api/freeze_class', data)
             .then(function (response) {
                 app.all_class_info();
                 if ('error' in response.data) {
@@ -207,7 +207,7 @@ var app = new Vue({
         unfreeze_class(cid) {
             let data = new FormData();
             data.append('cid', cid);
-            return axios.post('/unfreeze_class', data)
+            return axios.post('/api/unfreeze_class', data)
             .then(function (response) {
                 app.all_class_info();
                 if ('error' in response.data) {
@@ -231,7 +231,7 @@ var app = new Vue({
             data.append('cid', cid);
             data.append('url', url);
             data.append('note', note);
-            return axios.post('/modify_class', data)
+            return axios.post('/api/modify_class', data)
             .then(function (response) {
                 app.all_class_info();
                 if ('error' in response.data) {
@@ -255,7 +255,7 @@ var app = new Vue({
             if (app.student_cid < 0) {
                 app.student_dirty = false; return;
             }
-            return axios.get('/all_student_info/' + app.student_cid)
+            return axios.get('/api/all_student_info/' + app.student_cid)
             .then(function (response) {
                 if ('error' in response.data) {
                     app.$alert('错误代码：' + response.data.error, '出现错误');
@@ -281,7 +281,7 @@ var app = new Vue({
             let data = new FormData();
             data.append('cid', app.student_cid);
             data.append('student_info', JSON.stringify(v));
-            return axios.post('/modify_student_info', data)
+            return axios.post('/api/modify_student_info', data)
             .then(function (response) {
                 app.all_student_info();
                 if ('error' in response.data) {
@@ -388,7 +388,7 @@ var app = new Vue({
         },
     },
 })
-axios.get('/admin_check')
+axios.get('/api/admin_check')
 .then(function (response) {
     if ('ok' in response.data) {
         app.admin = true;

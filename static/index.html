@@ -228,6 +228,8 @@ header, .context-menu, .megamenu-content, footer { font-family: "Segoe UI", Aria
 <body class='typora-export os-windows' >
 <div id='write' class='is-node'>
 <h1>中华毽课程打卡系统</h1>
+<h2>前往各班打卡页面</h2>
+<div id="link"></div>
 <h2>闭眼单脚站</h2>
 <blockquote>
 	<p>闭眼单脚站立是通过测量人体在没有任何可视参照物的情况下，仅依靠大脑前庭器官的平衡感受器和全身肌肉的协调运动，来维持身体重心在单脚支撑面上的时间，以反映平衡能力的强弱。</p>
@@ -241,5 +243,18 @@ header, .context-menu, .megamenu-content, footer { font-family: "Segoe UI", Aria
 本开源项目于<a href="https://github.com/wuyuepku/shuttlecock">GitHub</a>托管，系统完全开放所有API，并在一定程度上保证系统的安全性和稳定性，详情参见<a href="docs_evolution.html">开发者文档</a>
 </div>
 <script src="./js/jquery-3.4.1.min.js"></script>
+<script>
+$.get("/api/all_active_class", function(result) {
+	let root = window.location.href.toString().split("?")[0];
+	console.log(root);
+	let html = "";
+	for (let i in result) {
+		let url = root + result[i] + "."
+		html += "<p><a href='" + url + "'>" + url + "</a></p>"
+	}
+	$("#link").html(html);
+	console.log(result);
+});
+</script>
 </body>
 </html>

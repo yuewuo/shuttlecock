@@ -80,6 +80,27 @@ sys.append_operational_specification(new Specification(
 .require_public_api("modify_student_info")
 );
 
+sys.append_operational_specification(new Specification(
+    "任何人可以获取当前未冻结的班级的url列表", 
+    "返回Json列表"
+)
+.require_public_api("all_active_class")
+);
+
+sys.append_operational_specification(new Specification(
+    "任何人可以根据班级名称获取数据，但不能通过<code>cid</code>获取", 
+    "返回gb2312编码的csv格式字符串，可以直接保存为文件用Excel打开，这是为了适配原先的前端程序"
+)
+.require_public_api("download_csv")
+);
+
+sys.append_operational_specification(new Specification(
+    "任何人可以上传当天的记录，内容仅为姓名和字符串，不能包括时间", 
+    "返回几种可能的错误，以字符串形式呈现（兼容之前的前端程序）"
+)
+.require_public_api("update_today")
+);
+
 //
 // Description Specification
 //
@@ -99,6 +120,17 @@ C.append_key("frozen", SDTT.BOOLEAN);
 C.append_key("student_info", Object.assign(SDTT.VARCHAR.concat(), {1:65536}));
 C.append_key("create_time", SDTT.TIMESTAMP);
 sys.append_sql_table(C);
+
+let R = new SqlDatabaseTable("R",
+    table="record",
+    description="存储打卡信息的表，对<code>rid</code>唯一；此表格对匿名用户只能添加，无法删除和修改老数据，同一天的数据会取最后一个为最终值");
+R.append_key("rid", SDTT.INTEGER, unique=true);
+R.append_key("cid", SDTT.INTEGER);
+R.append_key("name", Object.assign(SDTT.VARCHAR.concat(), {1:64}));
+R.append_key("value", Object.assign(SDTT.VARCHAR.concat(), {1:64}));
+R.append_key("remote_addr", Object.assign(SDTT.VARCHAR.concat(), {1:64}));
+R.append_key("time", SDTT.TIMESTAMP);
+sys.append_sql_table(R);
 
 //
 // Type Design
@@ -126,11 +158,21 @@ const T = {
         note: "C^\\mathtt{note}",
         student: "C^\\mathtt{student}"
     },
+    Record: {
+        collection: "R",
+        any: "R^\\mathtt{any}",
+        rid: "R^\\mathtt{rid}",
+        cid: "R^\\mathtt{cid}",
+        name: "R^\\mathtt{name}",
+        value: "R^\\mathtt{value}",
+        list: "R^\\mathtt{list}",
+    },
     Session: {
-        data: "s",
-        admin: "s^\\mathtt{admin}",
+        data: "S",
+        admin: "S^\\mathtt{admin}",
     },
     Password: "P",
+    CsvFile: "F",
 };
 sys.set_type(T);
 
@@ -139,7 +181,7 @@ sys.set_type(T);
 //
 
 let query_cid_by_url = new API("query_cid_by_url", 
-    description="通过字符串的班级链接来查找班级，返回cid的值",
+    description="通过字符串的班级链接来查找班级，返回cid的值；注意：不会返回已经冻结的班级",
     proposition = NLP(LPT.DEDUCTION,
         NLP(LPT.ATOM, T.Class.url),
         NLP(LPT.DEDUCTION,
@@ -154,6 +196,45 @@ let query_cid_by_url = new API("query_cid_by_url",
         ),
     ),
 ); sys.append_private_api(query_cid_by_url);
+
+let get_composed = new API("get_composed",
+    description="返回<code>cid</code>班级的列表，即：\"天:{人名:值}\"，这里不管",
+    proposition = NLP(LPT.DEDUCTION,
+        NLP(LPT.ATOM, T.Record.collection),
+        NLP(LPT.TENSOR,
+            NLP(LPT.ATOM, T.Record.collection),
+            NLP(LPT.ATOM, T.Record.list),
+        ),
+    ),
+); sys.append_private_api(get_composed);
+
+let get_student_info = new API("get_student_info",
+    description="返回<code>cid</code>班级的学生信息json数据",
+    proposition = NLP(LPT.DEDUCTION,
+        NLP(LPT.ATOM, T.Class.cid),
+        NLP(LPT.DEDUCTION,
+            NLP(LPT.ATOM, T.Class.collection),
+            NLP(LPT.TENSOR,
+                NLP(LPT.ATOM, T.Class.collection),
+                NLP(LPT.ATOM, T.Class.student),
+            ),
+        ),
+    ),
+); sys.append_private_api(get_student_info);
+
+let get_student_names = new API("get_student_names",
+    description="返回<code>cid</code>班级的学生名字数组",
+    proposition = NLP(LPT.DEDUCTION,
+        NLP(LPT.ATOM, T.Class.cid),
+        NLP(LPT.DEDUCTION,
+            NLP(LPT.ATOM, T.Class.collection),
+            NLP(LPT.TENSOR,
+                NLP(LPT.ATOM, T.Class.collection),
+                NLP(LPT.ATOM, T.Class.student),
+            ),
+        ),
+    ),
+); sys.append_private_api(get_student_info);
 
 //
 // Public API Design
@@ -347,6 +428,55 @@ let modify_student_info = new API("modify_student_info",
         ),
     ),
 ); sys.append_public_api(modify_student_info);
+
+let all_active_class = new API("all_active_class",
+    description="无需任何权限，直接返回未冻结的班级列表",
+    proposition = NLP(LPT.DEDUCTION,
+        NLP(LPT.ATOM, T.Class.collection),
+        NLP(LPT.TENSOR,
+            NLP(LPT.ATOM, T.Class.collection),
+            NLP(LPT.ATOM, T.Class.list),
+        ),
+    ),
+); sys.append_public_api(all_active_class);
+
+let download_csv = new API("download_csv",
+    description="无需任何权限，直接返回班级名称下的数据，注意：可能返回不存在，如果管理员冻结了该班级；同时，返回的数据不是数据库中完整的，而是处理过的，每一天每一人只取最后一次上传的记录",
+    proposition = NLP(LPT.DEDUCTION,
+        NLP(LPT.ATOM, T.Class.collection),
+        NLP(LPT.TENSOR,
+            NLP(LPT.ATOM, T.Class.collection),
+            NLP(LPT.DEDUCTION,
+                NLP(LPT.ATOM, T.Record.collection),
+                NLP(LPT.TENSOR,
+                    NLP(LPT.ATOM, T.Record.collection),
+                    NLP(LPT.ATOM, T.CsvFile),
+                ),
+            ),
+        ),
+    ),
+); sys.append_public_api(download_csv);
+
+let update_today = new API("update_today",
+    description="更新当天的数值",
+    proposition = NLP(LPT.DEDUCTION,
+        NLP(LPT.TENSOR,
+            NLP(LPT.ATOM, T.Class.url),
+            NLP(LPT.ATOM, T.Record.name),
+            NLP(LPT.ATOM, T.Record.value),
+        ),
+        NLP(LPT.DEDUCTION,
+            NLP(LPT.ATOM, T.Record.collection),
+            NLP(LPT.TENSOR,
+                NLP(LPT.OPERATION,
+                    NLP(LPT.ATOM, T.Record.collection),
+                    "\\cup(name,value)"
+                ),
+                NLP(LPT.TENSOR_UNIT),
+            ),
+        ),
+    ),
+); sys.append_public_api(update_today);
 
 $(function() {
     sys.render();
