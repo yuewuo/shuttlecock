@@ -271,7 +271,7 @@ var app = new Vue({
                     app.$alert('错误代码：' + response.data.error, '出现错误');
                 } else {
                     let v = response.data.sort((a,b)=>(b.n>a.n)?1:-1);  // 按名字排序
-                    for (let i in v) v[i].d = "";
+                    for (let i in v) if (!('d' in v[i])) v[i].d = "";
                     app.students = v;
                 }
                 app.student_dirty = false;
