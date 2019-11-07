@@ -70,7 +70,7 @@
         <h2>学生名单（cid={{student_cid}}）{{student_cid>0?"（共" + students.length + "人）":""}}</h2>
         </p>
             <el-button type="success" :disabled="student_cid==-1||!admin" @click="all_student_info()">刷新学生列表</el-button>
-            <el-button type="warning" :disabled="student_cid==-1||!student_dirty||!admin" @click="modify_student_info()">更新学生数据</el-button>
+            <el-button type="warning" :disabled="student_cid==-1||!student_dirty||!admin||student_cid_class.frozen==0" @click="modify_student_info()">更新学生数据</el-button>
             <el-input placeholder="新增学生姓名" v-model="new_student_name" style="width: 120px; margin-left: 20px;" :disabled="!admin"></el-input>
             <el-input type="textarea" :rows="1" placeholder="描述信息（选填）" v-model="new_student_description" style="width: 200px; margin: 0 10px 0 10px;" :disabled="!admin"></el-input>
             <el-button type="primary" :disabled="student_cid==-1||!admin" @click="new_student()">增加学生</el-button>
@@ -90,7 +90,7 @@
             <el-table-column label="操作">
             <template slot-scope="scope">
                 <el-button size="mini" type="primary" @click="view_student(scope.row.n)">查看数据</el-button>
-                <el-button size="mini" type="danger" @click="delete_student(scope.row.n)">删除（无法恢复）{{delete_cnt?"("+delete_cnt+")":""}}</el-button>
+                <el-button size="mini" type="danger" @click="delete_student(scope.row.n)" :disabled="student_cid_class.frozen==0">删除（无法恢复）{{delete_cnt?"("+delete_cnt+")":""}}</el-button>
             </template>
             </el-table-column>
         </el-table>
@@ -123,6 +123,7 @@ var app = new Vue({
         all_class_info_ret: [],
         class_dirty: false,
         student_cid: -1,
+        student_cid_class: null,
         students: [],
         student_dirty: false,
         delete_cnt: null,
@@ -165,6 +166,7 @@ var app = new Vue({
             app.students = [];
             app.all_class_info_ret = [];
             app.student_cid = -1;
+            app.student_cid_class = null;
             app.new_class_cid = -1;
             app.login().then(function () {
                 app.login_hint = "登录";
@@ -188,6 +190,12 @@ var app = new Vue({
                     let v = response.data.sort((a,b)=>b.cid-a.cid);
                     for (let i in v) v[i].dirty = false;
                     app.all_class_info_ret = v;
+                    app.student_cid_class = null;
+                    for (let i in app.all_class_info_ret) {
+                        if (app.all_class_info_ret[i].cid == app.student_cid) {
+                            app.student_cid_class = app.all_class_info_ret[i]; break;
+                        }
+                    }
                 }
                 app.class_dirty = false;
             })
@@ -259,12 +267,20 @@ var app = new Vue({
         },
         clear_student() {
             app.student_cid = -1;
+            app.student_cid_class = null;
             app.students = [];
         },
         all_student_info() {
             if (app.student_cid < 0) {
                 app.student_dirty = false; return;
             }
+            app.student_cid_class = null;
+            for (let i in app.all_class_info_ret) {
+                if (app.all_class_info_ret[i].cid == app.student_cid) {
+                    app.student_cid_class = app.all_class_info_ret[i]; break;
+                }
+            }
+            if (!app.student_cid_class) { app.$alert('无法找到班级，请刷新页面重试', '出现错误'); }
             return axios.get('/api/all_student_info/' + app.student_cid)
             .then(function (response) {
                 if ('error' in response.data) {
@@ -287,7 +303,6 @@ var app = new Vue({
                 if (app.students[i].d.length > 0) o.d = app.students[i].d;
                 v.push(o);
             }
-            console.log(v);
             let data = new FormData();
             data.append('cid', app.student_cid);
             data.append('student_info', JSON.stringify(v));
