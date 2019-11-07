@@ -245,7 +245,7 @@ header, .context-menu, .megamenu-content, footer { font-family: "Segoe UI", Aria
 <script src="./js/jquery-3.4.1.min.js"></script>
 <script>
 $.get("/api/all_active_class", function(result) {
-	let root = window.location.href.toString().split("?")[0];
+	let root = window.location.href.toString().split('/').slice(0,3).join("/")+"/";
 	console.log(root);
 	let html = "";
 	for (let i in result) {

@@ -27,10 +27,15 @@ function update_name() {
             }
         }
         if (found == -1) {
-            alert("未找到任何记录，请检查名字");
+            // alert("未找到任何记录，请检查名字");
+            console.error("未找到任何记录，请检查名字");
+            delpara("name");
+            delCookie('name');
+            $("#name").val("");
             return;
         }
         setCookie('name', name);
+        setpara("name", escape(name));
         $("#selfhistory").children().remove();
         $("#selfhistory").append("<tr><th>天</th><th>记录</th></tr>");
         for (let i=1; i<=longest; ++i) {
@@ -239,13 +244,53 @@ function downloadcsv() {
     window.location.href = "/api/download_csv/" + classname + '.csv?time=' + nowTime
 }
 
+function getpara(name, alternative=null) {
+	let reg = new RegExp("(^|&)"+ name +"=([^&]*)(&|$)");
+	let r = window.location.search.substr(1).match(reg);
+	if(r!=null) return unescape(r[2]); return alternative;
+}
+function setpara(name, value) {
+	let url = window.location.href.toString();
+	let reg = new RegExp("(^|&)"+ name +"=([^&]*)(&|$)");
+	let r = window.location.search.substr(1).match(reg);
+	if (r) url = url.replace(r[0], name+'='+value);
+	else {
+		let v = url.split("#");
+		if (v[0].indexOf("?") == -1) v[0] += "?";
+		if (v[0][v[0].length-1] != "?") v[0] += "&";
+		v[0] += name + "=" + escape(value);
+		url = v.join("#");
+	}
+	history.replaceState(null, "", url);
+	return url;
+}
+function delpara(name) {
+    let url = window.location.href.toString();
+	let reg = new RegExp("(^|&)"+ name +"=([^&]*)(&|$)");
+    let r = window.location.search.substr(1).match(reg);
+    if (r) {
+        url = url.replace(r[0], "");
+        url = url.replace("&&", "&");
+        if (url[url.length-1] == "?") url = url.slice(0, url.length-1);
+    }
+    console.log(url);
+	history.replaceState(null, "", url);
+	return url;
+}
+
 var version = 'version 1910102300';
 $(function() {
     $("#sysversion").html(version);
     console.log(version);
-    let name = getCookie('name');
+    let name = getpara('name');
     console.log(name);
-    if (name) $("#name").val(name);
+    if (!name) name = getCookie('name');
+    else name = unescape(name);
+    console.log(name);
+    if (name) {
+        setpara("name", escape(name));
+        $("#name").val(name);
+    }
     loadcsv(function() {
         if (name) update_name();
     });
@@ -258,6 +303,9 @@ function setCookie(name,value)
     var exp = new Date();
     exp.setTime(exp.getTime() + Days*24*60*60*1000);
     document.cookie = name + "="+ escape (value) + ";expires=" + exp.toGMTString();
+}
+function delCookie(name) {
+    document.cookie = name + "=";
 }
 function getCookie(name)
 {
