@@ -47,8 +47,9 @@ function update_name() {
 
 function update_today() {
     let name = $("#name").val();
-    let value =  $("#tdata").val();
-    if (name.length > 20 || value.length > 10) {
+    // let value =  $("#tdata").val();
+    let value = "L" + $("#tleft").val() + "R" + $("#tright").val() + ":" + $("#tcnt").val();
+    if (name.length > 20 || value.length > 32) {
         alert("输入过长");
         return;
     }
@@ -65,7 +66,7 @@ function update_today() {
             alert("更新成功");
             loadcsv(update_name);
         } else if (data.error == "ERROR:FORMAT") {
-            alert("格式错误，请检查输入格式，例如\"L6R6\"，中间无空格");
+            alert("格式错误，请检查输入格式，例如\"L6R8:36\"，中间无空格");
         } else if (data.error == "ERROR:TIME") {
             alert("时间错误，请联系管理员处理");
         } else if (data.error == "ERROR:NAME") {
@@ -77,8 +78,8 @@ function update_today() {
 }
 
 function variance_sqrt (numbers) {  
-    let mean = 0;  
-    let sum = 0;  
+    let mean = 0;
+    let sum = 0;
     for(let i=0;i<numbers.length;i++){  
         sum += numbers[i];  
     }  
@@ -114,10 +115,16 @@ function update_view() {
     }
     let num = table.length - 1;
     $("#finishnum").html("" + (num - unfinish_list.length) + "/" + num);
-    let todaysum = day_sum(longest);
+    let todaysum2 = day_sum(longest);
+    let todaysum = todaysum2[0];
+    let todaysum_cnt = todaysum2[1];
     $("#todaysum").html(todaysum);
-    let minusy = todaysum - day_sum(longest-1);
+    $("#todaysum_cnt").html(todaysum_cnt);
+    let yesterdaysum2 = day_sum(longest-1);
+    let minusy = todaysum - yesterdaysum2[0];
+    let minusy_cnt = todaysum_cnt - yesterdaysum2[1];
     $("#minusy").html((minusy > 0 ? "+" : "") + minusy);
+    $("#minusy_cnt").html((minusy_cnt > 0 ? "+" : "") + minusy_cnt);
     $("#unfinished").children().remove();
     // for (let i=0; i<unfinish_list.length / 3; ++i) {
     $("#allnames").children().remove();
@@ -142,11 +149,17 @@ function update_view() {
     }
 
     let data = [];
+    let data_cnt = [];
     for (let i=1; i<=longest; ++i) {
-        let daysum = day_sum(i);
+        let daysum2 = day_sum(i);
+        let daysum = daysum2[0];
+        let daysum_cnt = daysum2[1];
         let datcount = day_count(i);
-        let daydata = day_data(i);
+        let daydata2 = day_data(i);
+        let daydata = daydata2[0];
+        let daydata_cnt = daydata2[1];
         data.push([i, [daysum, 0], [datcount == 0 ? 0 : 10 * daysum / datcount, variance_sqrt(daydata)]]);
+        data_cnt.push([i, [daysum_cnt, 0], [datcount == 0 ? 0 : 10 * daysum_cnt / datcount, variance_sqrt(daydata_cnt)]])
     }
     for (let i=0; i<data.length; ++i) {
         let row = data[i][2];
@@ -157,16 +170,20 @@ function update_view() {
     //     'file': data
     // });
     if (generalg) {
-    } else init_graph(['天', '总秒数', '平均秒数×10'], data);
+    } else init_graph(['天', '总秒数', '平均秒数×10'], data, data_cnt);
 }
-function ele2LR(ele) {
+function ele2LR(ele2) {
+    let sp = ele2.split(":")
+    let ele = sp[0]
+    let cnt = 0
+    if (sp.length > 1) cnt = parseInt(sp[1])
     let l = ele.indexOf('L');
     let r = ele.indexOf('R');
-    if (l == -1 || r == -1) return {first: null, L: 0, R: 0}
+    if (l == -1 || r == -1) return {first: null, L: 0, R: 0, cnt: 0}
     if (l < r) {
-        return {first: "L", L: parseInt(ele.substr(1, r-l-1)), R: parseInt(ele.substr(r+1))};
+        return {first: "L", L: parseInt(ele.substr(1, r-l-1)), R: parseInt(ele.substr(r+1)), cnt: cnt };
     } else {
-        return {first: "R", R: parseInt(ele.substr(1, l-r-1)), L: parseInt(ele.substr(l+1))};
+        return {first: "R", R: parseInt(ele.substr(1, l-r-1)), L: parseInt(ele.substr(l+1)), cnt: cnt };
     }
 }
 function checkmore(name) {
@@ -175,12 +192,15 @@ function checkmore(name) {
     document.getElementById('name').scrollIntoView();
 }
 function day_sum(day) {
+    if (day < 1) return [0, 0]
     let sum = 0;
+    let sum_cnt = 0;
     for (let i=1; i<table.length; ++i) {
         let lr = ele2LR(table[i][day])
         sum += lr.L + lr.R;
+        sum_cnt += lr.cnt;
     }
-    return sum;
+    return [sum, sum_cnt];
 }
 
 function day_count(day) {
@@ -194,18 +214,34 @@ function day_count(day) {
 
 function day_data(day) {
     let daydata = [];
+    let daydata_cnt = []
     for (let i=1; i<table.length; ++i) {
         let lr = ele2LR(table[i][day])
-        if (lr.first) daydata.push(lr.L + lr.R);
+        // if (lr.first) daydata.push(lr.L + lr.R);
+        daydata.push(lr.L + lr.R);
+        daydata_cnt.push(lr.cnt);
     }
-    return daydata;
+    return [daydata, daydata_cnt];
 }
 
 var generalg = null;
-function init_graph(labels, data) {
+var general_cntg = null;
+function init_graph(labels, data, data_cnt) {
     generalg = new Dygraph(
         document.getElementById("general"),
         data,
+        {
+            labels: labels,
+            drawPoints: true,
+            errorBars: true,  // to enable error bar
+            drawAxesAtZero: true,
+            strokeWidth: 1,
+            showRangeSelector: true
+        }
+    );
+    general_cntg = new Dygraph(
+        document.getElementById("general_cnt"),
+        data_cnt,
         {
             labels: labels,
             drawPoints: true,
@@ -373,31 +409,38 @@ function count_interval() {
     // console.log(count);
 }
 function update_count(isleft) {
-    let val = $("#tdata").val();
-    let L = val.indexOf('L');
-    let R = val.indexOf('R');
-    let not2 = L == -1 || R == -1;
-    if (not2) {  // 直接输出
-        if (isleft && R == -1) {  // 只输出L
-            $("#tdata").val("L" + count);
-        } else if (!isleft && L == -1) {  // 只输出R
-            $("#tdata").val("R" + count);
-        } else {
-            if (isleft) $("#tdata").val(val + "L" + count);
-            else $("#tdata").val(val + "R" + count);
-        }
-    } else {  // 两个都有，则先获得他们
-        let Lval = 0;
-        let Rval = 0;
-        if (L < R) {
-            Lval = val.slice(L+1, R);
-            Rval = val.slice(R+1);
-        } else {
-            Rval = val.slice(R+1, L);
-            Lval = val.slice(L+1);
-        }
-        if (isleft) $("#tdata").val("R" + Rval + "L" + count);
-        else $("#tdata").val("L" + Lval + "R" + count);
+    // let val = $("#tdata").val();
+    // let L = val.indexOf('L');
+    // let R = val.indexOf('R');
+    // let not2 = L == -1 || R == -1;
+    // if (not2) {  // 直接输出
+    //     if (isleft && R == -1) {  // 只输出L
+    //         $("#tdata").val("L" + count);
+    //     } else if (!isleft && L == -1) {  // 只输出R
+    //         $("#tdata").val("R" + count);
+    //     } else {
+    //         if (isleft) $("#tdata").val(val + "L" + count);
+    //         else $("#tdata").val(val + "R" + count);
+    //     }
+    // } else {  // 两个都有，则先获得他们
+    //     let Lval = 0;
+    //     let Rval = 0;
+    //     if (L < R) {
+    //         Lval = val.slice(L+1, R);
+    //         Rval = val.slice(R+1);
+    //     } else {
+    //         Rval = val.slice(R+1, L);
+    //         Lval = val.slice(L+1);
+    //     }
+    //     if (isleft) $("#tdata").val("R" + Rval + "L" + count);
+    //     else $("#tdata").val("L" + Lval + "R" + count);
+    // }
+    if (isleft) {
+        let val = parseInt($("#tleft").val());
+        $("#tleft").val(val + count);
+    } else {
+        let val = parseInt($("#tright").val());
+        $("#tright").val(val + count);
     }
     // console.log(L);
 }

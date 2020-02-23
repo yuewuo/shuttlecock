@@ -221,20 +221,30 @@ header, .context-menu, .megamenu-content, footer { font-family: "Segoe UI", Aria
 .dropdown-menu .divider { border-color: rgb(229, 229, 229); }
 .ty-preferences .window-content { background-color: rgb(250, 250, 250); }
 .ty-preferences .nav-group-item.active { color: white; background: rgb(153, 153, 153); }
-
+.st { width: 50px; }
 
 </style>
 </head>
 <body class='typora-export os-windows' >
 <div id='write' class='is-node'>
-<h1><a name="闭眼单脚站统计" class="md-header-anchor"></a><span>闭眼单脚站统计</span></h1><p><span>根据国民体质检测相关标准（如下图），本页面记录同学一学期内的进步情况并制作表格</span></p><p><img src='standard.png' alt='' referrerPolicy='no-referrer' /></p><script src="./js/jquery-3.4.1.min.js"></script>
+<h1><a name="闭眼单脚站+连续踢毽数统计" class="md-header-anchor"></a><span>闭眼单脚站+连续踢毽数统计</span></h1><p><span>根据国民体质检测相关标准（如下图），本页面记录同学一学期内的进步情况并制作表格</span></p><p><img src='standard.png' alt='' referrerPolicy='no-referrer' /></p><script src="./js/jquery-3.4.1.min.js"></script>
 <script src="./js/dygraph.min.js"></script>
 <script src="./js/clipboard.min.js"></script>
-<script src="./js/statistics.js"></script><h2><a name="最新概况button-stylecolor-blue-border-radius-10px-onclickdownloadcsv点我下载button" class="md-header-anchor"></a><span>最新概况：</span><button style="color: blue; border-radius: 10px;" onclick="downloadcsv();"><span>点我下载</span></button></h2><p><span>最新记录为：</span><strong style="color:red;" id="nowdate"><span>正在加载</span></strong></p><p><span>完成状况为（已记录人数/总人数）：</span><strong id="finishnum" style="color:red"><span>正在加载</span></strong></p><p><span>今日累计秒数：</span><strong style="color:green;" id="todaysum"><span>正在加载</span></strong><span>（比昨日</span><strong id="minusy"><span>正在加载</span></strong><span>）</span></p><p><span>今日名单（绿色为已完成，点击查看详细数据）：</span></p><table id="allnames"></table><p><span>全班情况图表（</span><font style="color:green;"><span>绿线为全班加和</span></font><span>，</span><font style="color:blue;"><span>蓝线为平均值×10，边界为方均根大小</span></font><span>）：</span></p><div style="height: 400px;" id="general"></div><h2><a name="个人查询与更新" class="md-header-anchor"></a><span>个人查询与更新：</span></h2><p><input type="text" placeholder="请输入你的姓名" id="name"></input><button onclick="update_name()"><span>查询</span></button></p><div id="counting">
+<script src="./js/statistics.js"></script><h2><a name="最新概况button-stylecolor-blue-border-radius-10px-onclickdownloadcsv点我下载button" class="md-header-anchor"></a><span>最新概况：</span><button style="color: blue; border-radius: 10px;" onclick="downloadcsv();"><span>点我下载</span></button></h2><p><span>最新记录为：</span><strong style="color:red;" id="nowdate"><span>正在加载</span></strong></p><p><span>完成状况为（已记录人数/总人数）：</span><strong id="finishnum" style="color:red"><span>正在加载</span></strong></p>
+<p><span>今日累计秒数：</span><strong style="color:green;" id="todaysum"><span>正在加载</span></strong><span>（比昨日</span><strong id="minusy"><span>正在加载</span></strong><span>）</span></p>
+<p><span>今日累计踢毽数：</span><strong style="color:green;" id="todaysum_cnt"><span>正在加载</span></strong><span>（比昨日</span><strong id="minusy_cnt"><span>正在加载</span></strong><span>）</span></p>
+<p><span>今日名单（绿色为已完成，点击查看详细数据）：</span></p><table id="allnames"></table><p><span>全班情况图表（</span><font style="color:green;"><span>绿线为全班加和</span></font><span>，</span><font style="color:blue;"><span>蓝线为平均值×10，边界为方均根大小</span></font><span>）：</span></p>
+<div style="height: 200px;" id="general"></div><br>
+<div style="height: 200px;" id="general_cnt"></div>
+<h2><a name="个人查询与更新" class="md-header-anchor"></a><span>个人查询与更新：</span></h2><p><input type="text" placeholder="请输入你的姓名" id="name"></input><button onclick="update_name()"><span>查询</span></button></p><div id="counting">
 <span style="display: inline-block; border-radius: 50%; text-align:center; color: white; font-size: 130%;" id="left" onclick="start_counting(true)">计时左脚</span>
 <span style="display: inline-block; width: 20%; text-align:center; font-size: 150%" id="countnum">0</span>
 <span style="display: inline-block; border-radius: 50%; text-align:center; color: white; font-size: 130%;" id="right" onclick="start_counting(false)">计时右脚</span>
-</div><p><input type="text" placeholder="今日数据，如L23R33" id="tdata"></input><button onclick="update_today()"><span>更新今日</span></button></p><p><button id="clipbutton" style="color: green;" data-clipboard-action="copy"  data-clipboard-target="#clipinput"><span>生成微信群打卡消息并复制到剪切板</span></button></p><table id="selfhistory"></table>
+</div>
+<p>同时记录左脚秒数、右脚秒数和连续踢毽个数：</p>
+<p>左：<input type="number" placeholder="0" id="tleft" class="st" value="0"></input>&nbsp;右：<input type="number" placeholder="0" id="tright" class="st" value="0"></input>&nbsp;毽子数：<input type="number" placeholder="0" id="tcnt" class="st" value="0"></input></p>
+<p><input style="display: none;" type="text" placeholder="今日数据，如L23R33;40" id="tdata"></input><button onclick="update_today()"><span>更新今日</span></button></p>
+<p><button id="clipbutton" style="color: green;" data-clipboard-action="copy"  data-clipboard-target="#clipinput"><span>生成微信群打卡消息并复制到剪切板</span></button></p><table id="selfhistory"></table>
 <textarea id="clipinput" style="width: 100%;">此处显示微信打卡消息，如自动复制不可用，请手动复制</textarea><p><em><div style="color: grey;"><span>系统版本： </span><strong id="sysversion"><span>错误，请联系开发者</span></strong></div></em></p><p>&nbsp;</p>
 </div>
 </body>

@@ -279,7 +279,7 @@ class Specification {
             }
             require_public_api_html += `<blockquote>
             <p>${found?"<a href='#api_"+required_public_api+"'>":"<strong style='color:red'>"
-            }${required_public_api}${found?"<span style='margin-left: 20px;'>\\("+found.to_proposition_latex()+"\\)</span></a>":""}</p>
+            }${required_public_api}${found?"<span style='margin-left: 20px;'>\\("+found.to_proposition_latex()+"\\)</span></a>":"</strong>"}</p>
             </blockquote>
             `;
         }

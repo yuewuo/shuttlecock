@@ -43,7 +43,7 @@ def hello_world():
 def query_cid_by_url(url):
     global conn
     c = conn.cursor()
-    c.execute("SELECT cid FROM class WHERE frozen = false AND url = ?", (url,))
+    c.execute("SELECT cid FROM class WHERE frozen = 0 AND url = ?", (url,))
     ret = c.fetchone()
     if ret is None:
         return None
@@ -110,9 +110,9 @@ def admin_login(password):
 def _admin_login():
     password = request.form['password']
     if admin_login(password):
-        return { "ok": "login success" }
+        return jsonify({ "ok": "login success" })
     else:
-        return { "error": Error.PasswordError.value }
+        return jsonify({ "error": Error.PasswordError.value })
 
 def new_class():
     if not admin_check():
@@ -153,7 +153,7 @@ def freeze_class(cid):
         return { "error": Error.AuthRequired.value }
     global conn
     c = conn.cursor()
-    c.execute("UPDATE class set frozen = true where cid = %d" % cid)
+    c.execute("UPDATE class set frozen = 1 where cid = %d" % cid)
     conn.commit()
     return {}
 @app.route('/api/freeze_class', methods=['POST'])
@@ -166,9 +166,9 @@ def unfreeze_class(cid):
         return { "error": Error.AuthRequired.value }
     global conn
     c = conn.cursor()
-    c.execute("""UPDATE class set frozen = false WHERE cid = %d AND url != '' AND
+    c.execute("""UPDATE class set frozen = 0 WHERE cid = %d AND url != '' AND
         NOT EXISTS(SELECT * from class WHERE
-            cid != %d AND frozen = false AND
+            cid != %d AND frozen = 0 AND
             url IN (SELECT url FROM class WHERE cid = %d))""" % (cid, cid, cid))
     c.execute("SELECT frozen FROM class WHERE cid = %d" % cid)
     frozen = c.fetchone()[0]
@@ -190,7 +190,7 @@ def modify_class(cid, url, note):
         return { "error": Error.DataFormatError.value }
     global conn
     c = conn.cursor()
-    c.execute("UPDATE class set url = ? , note = ? WHERE cid = %d AND frozen = true" % (cid), (url, note))
+    c.execute("UPDATE class set url = ? , note = ? WHERE cid = %d AND frozen = 1" % (cid), (url, note))
     conn.commit()
     return {}
 @app.route('/api/modify_class', methods=['POST'])
@@ -219,7 +219,7 @@ def modify_student_info(cid, student_info):
         return { "error": Error.AuthRequired.value }
     global conn
     c = conn.cursor()
-    c.execute("UPDATE class set student_info = ? WHERE cid = %d AND frozen = true" % (cid), (student_info,))
+    c.execute("UPDATE class set student_info = ? WHERE cid = %d AND frozen = 1" % (cid), (student_info,))
     conn.commit()
     return {}
 @app.route('/api/modify_student_info', methods=['POST'])
@@ -232,7 +232,7 @@ def _modify_student_info():
 def all_active_class():
     global conn
     c = conn.cursor()
-    c.execute("SELECT url FROM class WHERE frozen = false")
+    c.execute("SELECT url FROM class WHERE frozen = 0")
     active_classes = []
     for row in c:
         active_classes.append(row[0])
@@ -286,8 +286,8 @@ def _download_csv(url):
     return jsonify(ret)
 
 def checkval(value):
-    if len(value) > 10: return False
-    if re.match("^L\d+R\d+$", value) or re.match("^R\d+L\d+$", value): return True
+    if len(value) > 32: return False
+    if re.match("^L\d+R\d+(:\d+)?$", value) or re.match("^R\d+L\d+(:\d+)?$", value): return True
     return False
 def update_today(url, name, value):
     cid = query_cid_by_url(url)
@@ -319,14 +319,15 @@ if __name__ == "__main__":
     app.debug = True
     conn = sqlite3.connect("./shuttlecock.db", check_same_thread=False)
 else:  # production mode
-    conn = sqlite3.connect("/home/admin/shuttlecock.db", check_same_thread=False)
+    # conn = sqlite3.connect("/home/admin/shuttlecock.db", check_same_thread=False)
+    conn = sqlite3.connect("./shuttlecock.db", check_same_thread=False)
 
 conn.execute('''
 CREATE TABLE IF NOT EXISTS class (
 cid INTEGER PRIMARY KEY AUTOINCREMENT,
 url VARCHAR(16) default '',
 note NVARCHAR(64) default '',
-frozen BOOLEAN default true,
+frozen BOOLEAN default 1,
 student_info NVARCHAR(65536) default '[]',
 create_time TIMESTAMP default (datetime('now', 'localtime'))
 );
