@@ -16,7 +16,8 @@ function update_name() {
         $("#selfhistory").children().remove();
         $("#selfhistory").append("<tr><th>姓名</th><th>记录</th></tr>");
         for (let i=1; i<table.length; ++i) {
-            $("#selfhistory").append("<tr><th>" + table[i][0] + "</th><th>" + table[i][longest] + "</th></tr>")
+            let lr = ele2LR(table[i][longest])
+            $("#selfhistory").append(`<tr><th>${table[i][0]}</th><th>左${lr.L}s 右${lr.R}s 踢毽${lr.cnt}</th></tr>`)
         }
     } else {
         let found = -1;
@@ -39,7 +40,9 @@ function update_name() {
         $("#selfhistory").children().remove();
         $("#selfhistory").append("<tr><th>天</th><th>记录</th></tr>");
         for (let i=1; i<=longest; ++i) {
-            $("#selfhistory").append("<tr><th>" + table[0][i] + "</th><th>" + table[found][i] + "</th></tr>")
+            let lr = ele2LR(table[found][i])
+            let dis = lr.first == null ? `<span style="color: grey;">无记录</span>` : `左${lr.L}s 右${lr.R}s 踢毽${lr.cnt}个`
+            $("#selfhistory").append(`<tr><th>${table[0][i]}</th><th>${dis}</th></tr>`)
         }
     }
     genwechat();
@@ -47,8 +50,9 @@ function update_name() {
 
 function update_today() {
     let name = $("#name").val();
+    let mcnt = parseInt($("#sel").val()) * parseInt($("#tcnt").val())
     // let value =  $("#tdata").val();
-    let value = "L" + $("#tleft").val() + "R" + $("#tright").val() + ":" + $("#tcnt").val();
+    let value = "L" + $("#tleft").val() + "R" + $("#tright").val() + ":" + mcnt;
     if (name.length > 20 || value.length > 32) {
         alert("输入过长");
         return;
@@ -236,7 +240,7 @@ function init_graph(labels, data, data_cnt) {
             errorBars: true,  // to enable error bar
             drawAxesAtZero: true,
             strokeWidth: 1,
-            showRangeSelector: true
+            // showRangeSelector: true
         }
     );
     general_cntg = new Dygraph(
@@ -248,7 +252,7 @@ function init_graph(labels, data, data_cnt) {
             errorBars: true,  // to enable error bar
             drawAxesAtZero: true,
             strokeWidth: 1,
-            showRangeSelector: true
+            // showRangeSelector: true
         }
     );
 }
@@ -262,7 +266,7 @@ function loadcsv(callback = null) {
     req.overrideMimeType('text\/plain; charset=gb2312');  // this costs me 2 hour to make gb2312 work...
     req.onload = function(event) {
         csv = req.response;
-        console.log(csv);
+        // console.log(csv);
         let a = csv.split('\n');
         for (let i=0; i<a.length; ++i) {
             let b = a[i].split(',');
@@ -314,7 +318,7 @@ function delpara(name) {
 	return url;
 }
 
-var version = 'version 1910102300';
+var version = 'version 20200224';
 $(function() {
     $("#sysversion").html(version);
     console.log(version);
