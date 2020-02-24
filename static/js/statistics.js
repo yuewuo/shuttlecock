@@ -17,7 +17,8 @@ function update_name() {
         $("#selfhistory").append("<tr><th>姓名</th><th>记录</th></tr>");
         for (let i=1; i<table.length; ++i) {
             let lr = ele2LR(table[i][longest])
-            $("#selfhistory").append(`<tr><th>${table[i][0]}</th><th>左${lr.L}s 右${lr.R}s 踢毽${lr.cnt}</th></tr>`)
+            let dis = lr.first == null ? `<span style="color: grey;">无记录</span>` : `左${lr.L}s 右${lr.R}s 踢毽${lr.cnt}个`
+            $("#selfhistory").append(`<tr><th>${table[i][0]}</th><th>左${dis}</th></tr>`)
         }
     } else {
         let found = -1;
@@ -360,7 +361,9 @@ function genwechat() {
     let idx = 1;
     for (let i=1; i<table.length; ++i) {
         if (table[i][longest].length > 1) {
-            st += "\n" + idx + ". " + table[i][0] + " " + table[i][longest];
+            let lr = ele2LR(table[i][longest])
+            let dis = `左${lr.L}s 右${lr.R}s 踢毽${lr.cnt}个`
+            st += "\n" + idx + ". " + table[i][0] + "：" + dis;
             ++idx;
         }
     }
