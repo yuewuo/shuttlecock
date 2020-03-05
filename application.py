@@ -2,8 +2,7 @@ from flask import Flask, jsonify, session, request, Response
 from enum import Enum
 from datetime import timedelta
 import sqlite3, os, json, time, datetime, re
-
-ADMIN_PASSWORD = "123456"
+import keys
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.urandom(24)
@@ -31,6 +30,7 @@ class Error(Enum):
     CidError = "CidError"
     ERROR_FORMAT = "ERROR:FORMAT"
     ERROR_NAME = "ERROR:NAME"
+    ERROR_DATE = "ERROR:DATE"
 
 @app.route('/hello')
 def hello_world():
@@ -52,7 +52,7 @@ def query_cid_by_url(url):
 def get_composed(cid):
     global conn
     c = conn.cursor()
-    c.execute("SELECT name, time, value FROM record WHERE cid = %d" % cid)
+    c.execute("SELECT name, time, value FROM record WHERE cid = %d ORDER BY rid ASC" % cid)
     composed = {}
     for row in c:
         name = row[0]
@@ -64,7 +64,7 @@ def get_composed(cid):
             for key in person:
                 if time.strftime("%Y-%m-%d", this_time) == time.strftime("%Y-%m-%d", key):
                     found_same_day = True
-                    if time.mktime(this_time) > time.mktime(key):  # later value override
+                    if time.mktime(this_time) >= time.mktime(key):  # later value override
                         del composed[name][key]
                         composed[name][this_time] = value
                     break
@@ -104,7 +104,7 @@ def _admin_check():
 
 def admin_login(password):
     session.permanent = True
-    ret = session['admin'] = (password == ADMIN_PASSWORD)
+    ret = session['admin'] = (password == keys.ADMIN_PASSWORD)
     return ret
 @app.route('/api/admin_login', methods=['POST'])
 def _admin_login():
@@ -309,17 +309,40 @@ def _update_today(url):
     value = request.form['value']
     return jsonify(update_today(url, name, value))
 
+def update_anyday(cid, name, date, value):
+    names = get_student_names(cid)
+    if names is None:
+        return { "error": Error.CidError.value }
+    if not checkval(value) or len(name) > 16:
+        return { "error": Error.ERROR_FORMAT.value }
+    if not name in names:
+        return { "error": Error.ERROR_NAME.value }
+    if not re.match("^\d\d\d\d-\d\d-\d\d \d\d:\d\d:\d\d?$", date):
+        return { "error": Error.ERROR_DATE.value }
+    global conn
+    c = conn.cursor()
+    c.execute("INSERT INTO record (cid, name, value, remote_addr, time) VALUES (%d, ?, ?, ?, ?)"%cid, (name, value, request.remote_addr, date))
+    conn.commit()
+    return { "ok": "update_anyday" }
+@app.route('/api/update_anyday/<int:cid>', methods=['POST'])
+def _update_anyday(cid):
+    name = request.form['name']
+    date = request.form['date']
+    value = request.form['value']
+    return jsonify(update_anyday(cid, name, date, value))
+
 #
 # configuration
 #
 
 if __name__ == "__main__":
     # local test
-    app.config['SECRET_KEY'] = b'T\xcfmx\x9b^$\xb0\xc9\xac\x99\xb1\x1eh\xc7\xa2\x1b.>k\xae\xb8$\xb2'
+    app.config['SECRET_KEY'] = keys.SECRET_KEY
     app.debug = True
     conn = sqlite3.connect("./shuttlecock.db", check_same_thread=False)
 else:  # production mode
     # conn = sqlite3.connect("/home/admin/shuttlecock.db", check_same_thread=False)
+    app.config['SECRET_KEY'] = keys.SECRET_KEY
     conn = sqlite3.connect("./shuttlecock.db", check_same_thread=False)
 
 conn.execute('''

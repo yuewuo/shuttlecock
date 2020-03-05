@@ -73,11 +73,11 @@
             <el-button type="warning" :disabled="student_cid==-1||!student_dirty||!admin||student_cid_class.frozen==0" @click="modify_student_info()">更新学生数据</el-button>
             <el-input placeholder="新增学生姓名" v-model="new_student_name" style="width: 120px; margin-left: 20px;" :disabled="!admin"></el-input>
             <el-input type="textarea" :rows="1" placeholder="描述信息（选填）" v-model="new_student_description" style="width: 200px; margin: 0 10px 0 10px;" :disabled="!admin"></el-input>
-            <el-button type="primary" :disabled="student_cid==-1||!admin" @click="new_student()">增加学生</el-button>
-            <el-button type="warning" :disabled="student_cid==-1||!admin" @click="dialogFormVisible = true">批量导入学生</el-button>
+            <el-button type="primary" :disabled="student_cid==-1||!admin||student_cid_class.frozen==0" @click="new_student()">增加学生</el-button>
+            <el-button type="warning" :disabled="student_cid==-1||!admin||student_cid_class.frozen==0" @click="dialogFormVisible = true">批量导入学生</el-button>
         </p>
         <el-table :data="students" style="width: 100%" border>
-            <el-table-column label="姓名">
+            <el-table-column label="姓名" width="100">
             <template slot-scope="scope">
                 {{ scope.row.n }}
             </template>
@@ -91,6 +91,7 @@
             <template slot-scope="scope">
                 <el-button size="mini" type="primary" @click="view_student(scope.row.n)">查看数据</el-button>
                 <el-button size="mini" type="danger" @click="delete_student(scope.row.n)" :disabled="student_cid_class.frozen==0">删除（无法恢复）{{delete_cnt?"("+delete_cnt+")":""}}</el-button>
+                <el-button size="mini" type="warning" @click="add_record_student(scope.row.n)" :disabled="student_cid_class.frozen==1">新增记录</el-button>
             </template>
             </el-table-column>
         </el-table>
@@ -104,6 +105,27 @@
                 <el-button @click="dialogFormVisible = false">取 消</el-button>
                 <el-button type="primary" @click="new_student_batch();">确 定</el-button>
             </div>
+        </el-dialog>
+        <el-dialog title="新增记录" :visible.sync="dialogRecordVisible" width="50%">
+            <el-form>
+                <h2 style="margin-top: 0;">{{record_name}}</h2>
+                <el-form-item label="选择新增记录日期：">
+                    <el-date-picker v-model="record_date" type="date" placeholder="选择日期" value-format="yyyy-MM-dd"></el-date-picker>
+                </el-form-item>
+                <el-form-item label="左脚秒数：">
+                    <el-input style="width: 100px;" type="number" placeholder="0" v-model="tleft"></input>
+                </el-form-item>
+                <el-form-item label="右脚秒数：">
+                    <el-input style="width: 100px;" type="number" placeholder="0" v-model="tright"></input>
+                </el-form-item>
+                <el-form-item label="踢毽个数：">
+                    <el-input style="width: 100px;" type="number" placeholder="0" v-model="tcnt"></input>
+                </el-form-item>
+            </el-form>
+            <span slot="footer" class="dialog-footer">
+                <el-button @click="dialogRecordVisible = false">取 消</el-button>
+                <el-button type="primary" @click="add_record();">确 定</el-button>
+            </span>
         </el-dialog>
     </div>
 </div>
@@ -132,6 +154,12 @@ var app = new Vue({
         new_student_description: "",
         new_student_name_batch: "",
         dialogFormVisible: false,
+        dialogRecordVisible: false,
+        record_date: "",
+        tleft: 0,
+        tright: 0,
+        tcnt: 0,
+        record_name: "",
     },
     methods: {
         login() {
@@ -346,6 +374,41 @@ var app = new Vue({
 			this.delete_cnt = null;
             app.student_dirty = true;
             app.modify_student_info();
+        },
+        add_record_student(name) {
+            this.record_name = name
+            this.dialogRecordVisible = true
+        },
+        add_record() {
+            if (!(app.tleft >= 0)) app.tleft = 0
+            if (!(app.tright >= 0)) app.tright = 0
+            if (!(app.tcnt >= 0)) app.tcnt = 0
+            let name = this.record_name
+            let date = this.record_date
+            if (date.length == 0) {
+                app.$alert('请选择日期', '出现错误'); return;
+            }
+            date += " 23:59:59"
+            let value = "L" + app.tleft + "R" + app.tright + ":" + app.tcnt;
+            let data = new FormData();
+            data.append('name', name);
+            data.append('date', date);
+            data.append('value', value);
+            return axios.post('/api/update_anyday/' + this.student_cid, data)
+            .then(function (response) {
+                if ('error' in response.data) {
+                    app.$alert('错误代码：' + response.data.error, '出现错误');
+                } else {
+                    app.$notify({
+                        title: '执行成功', type: 'success',
+                        message: "已插入新纪录"
+                    });
+                    app.dialogRecordVisible = false
+                }
+            })
+            .catch(function (error) {
+                app.$alert(error, '出现错误');
+            });
         },
         new_student() {
             if (app.new_student_name.length < 1) { app.$alert('姓名不能为空', '出现错误'); return; }
