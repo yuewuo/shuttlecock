@@ -40,6 +40,19 @@ function update_name() {
         setpara("name", escape(name));
         $("#selfhistory").children().remove();
         $("#selfhistory").append("<tr><th>天</th><th>记录</th></tr>");
+        if (table.length > 1) {
+            let now = new Date()
+            let now_date = (now.getMonth()+1) + "月" + now.getDate() + "日"
+            if (now_date == table[0][longest]) {
+                let lr = ele2LR(table[found][longest])
+                if (lr.first != null) {
+                    $("#sel").val(1)
+                    $("#tcnt").val(lr.cnt)
+                    $("#tleft").val(lr.L)
+                    $("#tright").val(lr.R)
+                }
+            }
+        }
         for (let i=1; i<=longest; ++i) {
             let lr = ele2LR(table[found][i])
             let dis = lr.first == null ? `<span style="color: grey;">无记录</span>` : `左${lr.L}s 右${lr.R}s 踢毽${lr.cnt}个`
@@ -324,7 +337,6 @@ $(function() {
     $("#sysversion").html(version);
     console.log(version);
     let name = getpara('name');
-    console.log(name);
     if (!name) name = getCookie('name');
     else name = unescape(name);
     console.log(name);
