@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 from matplotlib import pyplot as plt
 from openpyxl import Workbook
 
-starting_points = {
+classes = {
     "data_class3": {
         "10.22.xls": (70, 420),
         "10.29.xls": (20, 540),
@@ -39,22 +39,34 @@ starting_points = {
         "12.11.xls": (10, 280),
         "12.25.xls": (20, 280),
     },
+    "data_graduate": {
+        "10.21.xls": (20, 400),
+        "10.28.xls": (140, 480),
+        "11.04.xls": (200, 470),
+        "11.11.xls": (70, 380),
+        "11.18.xls": (50, 310),
+        "11.25.xls": (20, 310),
+        "12.02.xls": (60, 350),
+        "12.09.xls": (30, 340),
+        "12.16.xls": (80, 380),
+        "12.23.xls": (120, 380),
+    },
 }
 
 def main():
-    # ## Step 1: manually generate `starting_points` variable for each class
-    # class_name = "data_class3"
-    # class_name = "data_class4"
-    # class_name = "data_class5"
+    # ## Step 1: manually generate `classes` variable for each class
+    # # class_name = "data_class3"
+    # # class_name = "data_class4"
+    # # class_name = "data_class5"
+    # class_name = "data_graduate"
     # file_list = os.listdir(class_name)
     # for filename in file_list:
     #     print("analyzing " + filename)
     #     filepath = os.path.abspath(os.path.join(class_name, filename))
-    #     # plot single file to manually set `starting_points`, do this at first
+    #     # plot single file to manually set `classes`, do this at first
     #     plot_single_file(filepath)
     
     ## Step 2: automatically split the data based on which is higher
-    classes = ["data_class3", "data_class4", "data_class5"]
     for class_name in classes:
         generate_splitted_file(class_name)
 
@@ -70,7 +82,7 @@ def generate_splitted_file(class_name):
             ws = wb.create_sheet(title=filename[:-4])  # for example: 10.22
         filepath = os.path.abspath(os.path.join(class_name, filename))
         names, times, aligned_data = parse_single_file(read_single_file(filepath))
-        former_start, latter_start = starting_points[class_name][filename]
+        former_start, latter_start = classes[class_name][filename]
         for i in range(180):
             ws.cell(row=1, column=i+3).value = i
         ws.cell(row=1, column=2).value = "秒数"
