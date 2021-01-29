@@ -2,3 +2,4 @@
 __pycache__/
 scripts/analyze_heart_rate/data*
 scripts/analyze_heart_rate/*.xlsx
+scripts/*/*.xlsx
