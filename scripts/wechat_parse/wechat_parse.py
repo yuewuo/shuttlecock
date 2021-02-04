@@ -33,9 +33,9 @@ def add_parsed_data_to_excel(input_file, parsed_data, output_file):
             else:
                 total_count, continuous_count, tire = mapping[name]
                 name_row = name_to_row_mapping[name]
-                input_ws.cell(row=name_row, column=first_none_column).value = str(total_count)
-                input_ws.cell(row=name_row, column=first_none_column+1).value = str(continuous_count)
-                input_ws.cell(row=name_row, column=first_none_column+2).value = tire
+                input_ws.cell(row=name_row, column=first_none_column+1).value = str(total_count)
+                input_ws.cell(row=name_row, column=first_none_column+2).value = str(continuous_count)
+                input_ws.cell(row=name_row, column=first_none_column+3).value = tire
         first_none_column += 4
     input_wb.save(filename = output_file)
 
