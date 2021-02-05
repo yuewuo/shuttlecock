@@ -9,16 +9,20 @@ classes = ["class3", "class4", "class5"]
 def main():
     for class_name in classes:
         reformat_heart_rate_min_max(class_name + ".xlsx", "../analyze_heart_rate/data_" + class_name + ".xlsx",
-            parse_txt_chat("../wechat_parse/" + class_name + ".txt"), "../match_psycho_data/cleandata_all.xlsx",
+            parse_txt_chat("../wechat_parse/" + class_name + ".txt"), "../match_psycho_data/cleandata_all.xlsx", "revised_score.xlsx",
             "reformat_min_max_" + class_name + ".xlsx")
         # exit(0)
 
-def reformat_heart_rate_min_max(input_file, heart_rate_file, parsed_data, cleandata_file, output_file):
+def reformat_heart_rate_min_max(input_file, heart_rate_file, parsed_data, cleandata_file, revised_score_file, output_file):
     input_wb = load_workbook(input_file)
     input_ws = input_wb.active
     assert input_ws.cell(row=1, column=2).value == "姓名"
     assert input_ws.cell(row=1, column=3).value == "年龄"
     assert input_ws.cell(row=1, column=4).value == "年级"
+    assert input_ws.cell(row=1, column=7).value == "期中成绩（对）"
+    assert input_ws.cell(row=1, column=8).value == "方式"
+    assert input_ws.cell(row=1, column=9).value == "期末成绩（对）"
+    assert input_ws.cell(row=1, column=10).value == "方式"
     assert input_ws.cell(row=1, column=14).value == "日期"
     assert input_ws.cell(row=1, column=15).value == "平均心率"
     assert input_ws.cell(row=1, column=16).value == "最大值"
@@ -36,6 +40,11 @@ def reformat_heart_rate_min_max(input_file, heart_rate_file, parsed_data, cleand
         name_to_row_mapping[name] = name_row
         student_id = str(input_ws.cell(row=name_row, column=1).value)
         id_to_row_mapping[student_id] = name_row
+        # remove wrong score
+        input_ws.cell(row=name_row, column=7).value = None
+        input_ws.cell(row=name_row, column=8).value = None
+        input_ws.cell(row=name_row, column=9).value = None
+        input_ws.cell(row=name_row, column=10).value = None
         name_row += 1
     name_none_row = name_row
     # find first none column
@@ -122,6 +131,24 @@ def reformat_heart_rate_min_max(input_file, heart_rate_file, parsed_data, cleand
             input_ws.cell(row=name_new_row, column=3).value = cleandata_ws.cell(row=student_id_row, column=2).value
             input_ws.cell(row=name_new_row, column=4).value = cleandata_ws.cell(row=student_id_row, column=4).value
         student_id_row += 1
+    # update score using revised_score_file
+    revised_score_wb = load_workbook(revised_score_file)
+    revised_score_ws = revised_score_wb.active
+    assert revised_score_ws.cell(row=1, column=1).value == "学号"
+    assert revised_score_ws.cell(row=1, column=5).value == "期中成绩（对）"
+    assert revised_score_ws.cell(row=1, column=6).value == "方式"
+    assert revised_score_ws.cell(row=1, column=7).value == "期末成绩（对）"
+    assert revised_score_ws.cell(row=1, column=8).value == "方式"
+    student_id_row = 2
+    while revised_score_ws.cell(row=student_id_row, column=1).value is not None:
+        student_id = str(revised_score_ws.cell(row=student_id_row, column=1).value)
+        if student_id in id_to_row_mapping:
+            name_row = id_to_row_mapping[student_id]
+            name_new_row = get_name_new_row(name_row)
+            for i in range(4):
+                input_ws.cell(row=name_new_row, column=7+i).value = revised_score_ws.cell(row=student_id_row, column=5+i).value
+        student_id_row += 1
+    # save output
     input_wb.save(filename = output_file)
 
 if __name__ == "__main__":
