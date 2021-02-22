@@ -31,6 +31,7 @@ def reformat_heart_rate_min_max(input_file, heart_rate_file, parsed_data, cleand
     assert input_ws.cell(row=1, column=19).value == "三分钟总数"
     assert input_ws.cell(row=1, column=20).value == "一次连续最多"
     assert input_ws.cell(row=1, column=21).value == "感觉"
+    first_none_column = 22
     # build name mapping
     name_row = 2
     name_to_row_mapping = { }
@@ -48,9 +49,6 @@ def reformat_heart_rate_min_max(input_file, heart_rate_file, parsed_data, cleand
         name_row += 1
     name_none_row = name_row
     # find first none column
-    first_none_column = 3
-    while input_ws.cell(row=1, column=first_none_column).value is not None:
-        first_none_column += 1
     heart_rate_wb = load_workbook(heart_rate_file)
     sheet_length = len(heart_rate_wb.sheetnames)
     get_name_new_row = lambda row: (row - 2) * sheet_length + 2
@@ -123,6 +121,12 @@ def reformat_heart_rate_min_max(input_file, heart_rate_file, parsed_data, cleand
     assert cleandata_ws.cell(row=1, column=2).value == "pre_Age"
     assert cleandata_ws.cell(row=1, column=4).value == "pre_Yearofcollege"
     student_id_row = 2
+    cleandata_first_none_column = 2
+    while cleandata_ws.cell(row=1, column=cleandata_first_none_column).value is not None:
+        cleandata_first_none_column += 1
+    # copy title
+    for i in range(2, cleandata_first_none_column):
+        input_ws.cell(row=1, column=first_none_column+i).value = cleandata_ws.cell(row=1, column=i).value
     while cleandata_ws.cell(row=student_id_row, column=1).value is not None:
         student_id = str(cleandata_ws.cell(row=student_id_row, column=1).value)
         if student_id in id_to_row_mapping:
@@ -130,6 +134,9 @@ def reformat_heart_rate_min_max(input_file, heart_rate_file, parsed_data, cleand
             name_new_row = get_name_new_row(name_row)
             input_ws.cell(row=name_new_row, column=3).value = cleandata_ws.cell(row=student_id_row, column=2).value
             input_ws.cell(row=name_new_row, column=4).value = cleandata_ws.cell(row=student_id_row, column=4).value
+            # also append data after all
+            for i in range(2, cleandata_first_none_column):
+                input_ws.cell(row=name_new_row, column=first_none_column+i-2).value = cleandata_ws.cell(row=student_id_row, column=i).value
         student_id_row += 1
     # update score using revised_score_file
     revised_score_wb = load_workbook(revised_score_file)
