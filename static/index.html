@@ -249,7 +249,7 @@ $.get("/api/all_active_class", function(result) {
 	console.log(root);
 	let html = "";
 	for (let i in result) {
-		let url = root + result[i] + "."
+		let url = root + result[i] + ".html"
 		html += "<p><a href='" + url + "'>" + url + "</a></p>"
 	}
 	$("#link").html(html);
