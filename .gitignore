@@ -5,3 +5,4 @@ scripts/analyze_heart_rate/*.xlsx
 scripts/*/*.xlsx
 scripts/*/*.xls
 scripts/wechat_parse/*.txt
+scripts/*/*.docx
