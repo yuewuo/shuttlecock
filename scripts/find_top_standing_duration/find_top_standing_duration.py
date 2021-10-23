@@ -7,11 +7,14 @@ class PersonBest:
         self.best_duration = 0
         self.best_date = None
         self.best_count = 0
+        self.total_count = 0
+        self.total_days = 0
 
 def main():
     classes = ["class1", "class2", "class3", "class4", "class5", "class6", "grad"]
     best_persons = []
     best_count_persons = []
+    total_count_persons = []
     for classname in classes:
         table = buildtable(classname)
         for row in table[1:]:
@@ -20,6 +23,7 @@ def main():
             name = row[0]
             person_best = PersonBest(classname, name)
             count_person_best = PersonBest(classname, name)
+            count_person_total = PersonBest(classname, name)
             for i in range(1, len(row)):
                 val = row[i]
                 if val == "":
@@ -38,12 +42,16 @@ def main():
                 if count > count_person_best.best_count:
                     count_person_best.best_count = count
                     count_person_best.best_date = table[0][i]
+                count_person_total.total_count += count
+                count_person_total.total_days += 1
             # print(classname, name, person_best.best_duration, person_best.best_date)
             best_persons.append(person_best)
             best_count_persons.append(count_person_best)
+            total_count_persons.append(count_person_total)
         # exit(0)
     best_persons.sort(key = lambda x: -x.best_duration)
     best_count_persons.sort(key = lambda x: -x.best_count)
+    total_count_persons.sort(key = lambda x: -x.total_count)
     print("best duration")
     for i in range(10):
         person_best = best_persons[i]
@@ -52,6 +60,10 @@ def main():
     for i in range(10):
         count_person_best = best_count_persons[i]
         print(count_person_best.classname, count_person_best.name, count_person_best.best_count, count_person_best.best_date)
+    print("total count <classname> <name> <total_count> <total_days>")
+    for i in range(10):
+        count_person_total = total_count_persons[i]
+        print(count_person_total.classname, count_person_total.name, count_person_total.total_count, count_person_total.total_days)
 
 def buildtable(classname, csvname = None):
     csvcontent = ""

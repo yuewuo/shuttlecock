@@ -19,6 +19,9 @@ def class_files(classname):
 @app.route('/<classname>.html', methods=['GET'])
 def class_files_2(classname):
     return app.send_static_file("template.html")
+@app.route('/admin.html', methods=['GET'])
+def admin_file():
+    return app.send_static_file("admin.html")
 
 class Error(Enum):
     NotImplement = "NotImplement"
