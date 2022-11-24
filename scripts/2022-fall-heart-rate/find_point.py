@@ -5,7 +5,6 @@ import numpy as np
 import json
 
 
-record_length = 360  # 6 min
 skip_found = False
 display_all = False
 if display_all:

@@ -10,6 +10,8 @@ class_infos = [
     [(9, 16, '9.16.csv'), (9, 30, '9.30.csv'), (10, 7, '10.7.csv'), (10, 14, '10.14.csv'), (10, 21, '10.21.csv'), (10, 28, '10.28.csv'), (11, 4, '11.4.csv'), (11, 11, '11.11.csv')]
 ]
 
+record_length = 360  # 6 min
+
 class StudentData:
     def __init__(self, class_time, student_name) -> None:
         self.class_time = class_time  # e.g. 2022.09.13 11:15:24 -  11:41:26
