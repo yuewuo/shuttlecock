@@ -4,6 +4,8 @@ history_data_path = "../history_data"
 
 def main():
     for term in os.listdir(history_data_path):
+        if term.endswith(".DS_Store"):
+            continue
         # print(f"analyzing term {term}...")
         classes_csv = os.listdir(os.path.join(history_data_path, term))
         person_count = 0
